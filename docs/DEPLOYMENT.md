@@ -12,6 +12,10 @@ WholesalePOS is currently structured for single-device local deployment. The nor
 - Restrict CORS to the local frontend origin for the desktop build.
 - Enable log collection for backend stdout.
 
+## Desktop Troubleshooting
+
+If the Windows desktop app shows a startup error, check the startup log at `%APPDATA%\WholesalePOS\logs\desktop.log`. The log records database migration output and local backend startup output.
+
 ## Updates
 
 The desktop shell includes `electron-updater` wiring. Published update channels still need a release feed configured before automatic production updates can be delivered.

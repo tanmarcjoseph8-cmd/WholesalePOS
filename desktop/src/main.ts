@@ -19,11 +19,21 @@ type BackendRuntime = {
   databasePath: string;
   databaseUrl: string;
   frontendDist: string;
+  nodeRuntime: string;
   port: number;
   secrets: DesktopSecrets;
 };
 
 let backendProcess: ChildProcessWithoutNullStreams | undefined;
+let logFilePath: string | undefined;
+
+function writeLog(message: string) {
+  const line = `[${new Date().toISOString()}] ${message.trimEnd()}\n`;
+  console.info(line);
+  if (logFilePath) {
+    fs.appendFileSync(logFilePath, line, "utf8");
+  }
+}
 
 function toFileUrlPath(filePath: string) {
   return `file:${filePath.replace(/\\/g, "/")}`;
@@ -66,6 +76,14 @@ function resolveNodeModulePath(relativePath: string) {
   return path.resolve(app.getAppPath(), "..", "node_modules", relativePath);
 }
 
+function resolveNodeRuntime() {
+  if (app.isPackaged) {
+    return resolveRuntimePath(path.join("runtime", process.platform === "win32" ? "node.exe" : "node"));
+  }
+
+  return process.execPath;
+}
+
 function findAvailablePort(preferredPort: number, host = "127.0.0.1") {
   return new Promise<number>((resolve, reject) => {
     const server = net.createServer();
@@ -101,11 +119,11 @@ function runCommand(command: string, args: string[], env: NodeJS.ProcessEnv, cwd
     });
 
     child.stderr.on("data", (data: Buffer) => {
-      console.error(data.toString());
+      writeLog(data.toString());
     });
 
     child.stdout.on("data", (data: Buffer) => {
-      console.info(data.toString());
+      writeLog(data.toString());
     });
 
     child.once("error", reject);
@@ -141,7 +159,7 @@ function waitForBackend(port: number) {
 
     const retry = () => {
       if (Date.now() - startedAt > 20_000) {
-        reject(new Error("The local backend did not start in time."));
+        reject(new Error(`The local backend did not start in time. Startup log: ${logFilePath ?? "unavailable"}`));
         return;
       }
       setTimeout(attempt, 250);
@@ -153,16 +171,21 @@ function waitForBackend(port: number) {
 
 function buildBackendRuntime(port: number): BackendRuntime {
   const userDataPath = app.getPath("userData");
+  const logDirectory = path.join(userDataPath, "logs");
+  ensureDirectory(logDirectory);
+  logFilePath = path.join(logDirectory, "desktop.log");
+
   const databaseDirectory = path.join(userDataPath, "database");
   ensureDirectory(databaseDirectory);
 
   const secrets = loadOrCreateSecrets(userDataPath);
   const backendEntry = resolveRuntimePath(path.join("backend", "dist", "server.js"));
   const frontendDist = resolveRuntimePath(path.join("frontend", "dist"));
+  const nodeRuntime = resolveNodeRuntime();
   const databasePath = path.join(databaseDirectory, "wholesalepos.sqlite");
   const databaseUrl = toFileUrlPath(databasePath);
 
-  return { backendEntry, databasePath, databaseUrl, frontendDist, port, secrets };
+  return { backendEntry, databasePath, databaseUrl, frontendDist, nodeRuntime, port, secrets };
 }
 
 function buildBackendEnv(runtime: BackendRuntime) {
@@ -184,11 +207,11 @@ async function runMigrations(runtime: BackendRuntime) {
   const prismaCli = resolveNodeModulePath(path.join("prisma", "build", "index.js"));
   const schemaPath = resolveRuntimePath(path.join("backend", "prisma", "schema.prisma"));
   const cwd = app.isPackaged ? app.getAppPath() : path.resolve(app.getAppPath(), "..");
-  await runCommand(process.execPath, [prismaCli, "migrate", "deploy", "--schema", schemaPath], buildBackendEnv(runtime), cwd);
+  await runCommand(runtime.nodeRuntime, [prismaCli, "migrate", "deploy", "--schema", schemaPath], buildBackendEnv(runtime), cwd);
 }
 
 function runBackend(runtime: BackendRuntime) {
-  backendProcess = spawn(process.execPath, [runtime.backendEntry], {
+  backendProcess = spawn(runtime.nodeRuntime, [runtime.backendEntry], {
     env: {
       ...buildBackendEnv(runtime),
       ELECTRON_RUN_AS_NODE: "1"
@@ -198,16 +221,16 @@ function runBackend(runtime: BackendRuntime) {
   });
 
   backendProcess.stderr.on("data", (data: Buffer) => {
-    console.error(data.toString());
+    writeLog(data.toString());
   });
 
   backendProcess.stdout.on("data", (data: Buffer) => {
-    console.info(data.toString());
+    writeLog(data.toString());
   });
 
   backendProcess.once("exit", (code) => {
     if (code && code !== 0) {
-      console.error(`Local backend exited with code ${code}.`);
+      writeLog(`Local backend exited with code ${code}.`);
     }
   });
 }

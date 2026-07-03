@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = path.join(root, "desktop", "app-assets");
 const desktopPrismaClient = path.join(root, "desktop", "node_modules", ".prisma", "client");
+const bundledNode = process.execPath;
 
 function findGeneratedPrismaClient() {
   const pnpmStore = path.join(root, "node_modules", ".pnpm");
@@ -25,7 +26,8 @@ function findGeneratedPrismaClient() {
 const assets = [
   { from: path.join(root, "backend", "dist"), to: path.join(assetsRoot, "backend", "dist") },
   { from: path.join(root, "backend", "prisma"), to: path.join(assetsRoot, "backend", "prisma") },
-  { from: path.join(root, "frontend", "dist"), to: path.join(assetsRoot, "frontend", "dist") }
+  { from: path.join(root, "frontend", "dist"), to: path.join(assetsRoot, "frontend", "dist") },
+  { from: bundledNode, to: path.join(assetsRoot, "runtime", process.platform === "win32" ? "node.exe" : "node") }
 ];
 
 fs.rmSync(assetsRoot, { recursive: true, force: true });
