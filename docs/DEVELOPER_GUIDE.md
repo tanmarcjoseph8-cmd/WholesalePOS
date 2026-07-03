@@ -17,3 +17,7 @@ The repository separates UI, server behavior, data ownership, and operational do
 - Use transactions for inventory, sales, receiving, and price changes.
 - Publish Socket.IO events after committed business changes.
 - Preserve backwards compatibility for existing API consumers.
+
+## Product Module
+
+The product catalog owns SKU, barcode, unit, price, supplier, and category metadata. Product writes live in backend services, run through Zod validation, create audit rows, and publish realtime events after successful transactions.

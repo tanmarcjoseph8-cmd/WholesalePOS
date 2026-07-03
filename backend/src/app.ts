@@ -9,6 +9,7 @@ import { requestLogger } from "./middleware/request-logger.js";
 import { apiRateLimit } from "./middleware/rate-limit.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
+import { productRouter } from "./modules/products/product.routes.js";
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp() {
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/products", productRouter);
 
   app.use(errorHandler);
 

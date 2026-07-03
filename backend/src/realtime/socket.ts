@@ -2,6 +2,8 @@ import type http from "node:http";
 import { Server } from "socket.io";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
+import { subscribeRealtimeEvent } from "./bus.js";
+import { realtimeEvents } from "./events.js";
 
 export function createRealtimeServer(server: http.Server) {
   const io = new Server(server, {
@@ -17,6 +19,12 @@ export function createRealtimeServer(server: http.Server) {
       logger.info("Realtime client disconnected", { socketId: socket.id, reason });
     });
   });
+
+  for (const eventName of Object.values(realtimeEvents)) {
+    subscribeRealtimeEvent(eventName, (payload) => {
+      io.emit(eventName, payload);
+    });
+  }
 
   return io;
 }
