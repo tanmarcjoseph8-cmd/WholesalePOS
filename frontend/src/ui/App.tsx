@@ -1,17 +1,19 @@
-import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, Search, Sun } from "lucide-react";
+import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, Search, Sun, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardPage } from "../views/DashboardPage";
 import { PosPage } from "../views/PosPage";
 import { InventoryPage } from "../views/InventoryPage";
+import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
-import { clearSession, fetchSetupStatus, loadSession, login, saveSession, setupOwner, type AuthSession } from "../lib/api";
+import { clearSession, fetchCurrentUser, fetchSetupStatus, loadSession, login, saveSession, setupOwner, type AuthSession } from "../lib/api";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: ChartNoAxesCombined },
-  { to: "/pos", label: "POS", icon: ReceiptText },
-  { to: "/inventory", label: "Inventory", icon: Boxes }
+  { to: "/pos", label: "POS", icon: ReceiptText, permission: "sales.manage" },
+  { to: "/inventory", label: "Inventory", icon: Boxes, permission: "products.manage" },
+  { to: "/users", label: "Users", icon: Users, permission: "users.manage" }
 ];
 
 function AuthScreen({ onSession }: { onSession: (session: AuthSession) => void }) {
@@ -116,6 +118,7 @@ function AuthScreen({ onSession }: { onSession: (session: AuthSession) => void }
 export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
+  const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser, enabled: Boolean(session) });
   const health = useApiHealth();
   const statusLabel = useMemo(() => {
     if (health.isLoading) return "Checking";
@@ -130,6 +133,12 @@ export function App() {
     return <AuthScreen onSession={setSession} />;
   }
 
+  const permissions = currentUser.data?.permissions ?? [];
+  const visibleNavItems = navItems.filter((item) => !item.permission || permissions.includes(item.permission));
+  const canUseSales = permissions.includes("sales.manage");
+  const canManageProducts = permissions.includes("products.manage");
+  const canManageUsers = permissions.includes("users.manage");
+
   return (
     <div className="min-h-screen bg-slate-100 text-ink transition-colors dark:bg-slate-950 dark:text-white">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-slate-200 bg-white px-5 py-6 dark:border-slate-800 dark:bg-slate-900 lg:block">
@@ -138,7 +147,7 @@ export function App() {
           <h1 className="mt-1 text-2xl font-bold">Enterprise</h1>
         </div>
         <nav className="space-y-2">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -200,8 +209,9 @@ export function App() {
         <main className="px-4 py-6 sm:px-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/pos" element={<PosPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
+            <Route path="/inventory" element={canManageProducts ? <InventoryPage /> : <DashboardPage />} />
+            <Route path="/users" element={canManageUsers ? <UsersPage /> : <DashboardPage />} />
           </Routes>
         </main>
       </div>

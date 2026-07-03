@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getActor } from "../auth/actor.js";
-import { requireAuth } from "../auth/auth.middleware.js";
+import { requireAuth, requirePermission } from "../auth/auth.middleware.js";
 import { asyncHandler } from "../../shared/async-handler.js";
 import {
   adjustInventoryCount,
@@ -20,6 +20,7 @@ import {
 export const inventoryRouter = Router();
 
 inventoryRouter.use(requireAuth);
+inventoryRouter.use(requirePermission("inventory.manage"));
 
 inventoryRouter.get(
   "/stock",

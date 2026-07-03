@@ -13,6 +13,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
 import { inventoryRouter } from "./modules/inventory/inventory.routes.js";
 import { productRouter } from "./modules/products/product.routes.js";
+import { userRouter } from "./modules/users/user.routes.js";
 
 export function createApp() {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/inventory", inventoryRouter);
   app.use("/api/products", productRouter);
+  app.use("/api/users", userRouter);
 
   if (env.FRONTEND_DIST_DIR && fs.existsSync(env.FRONTEND_DIST_DIR)) {
     app.use(express.static(env.FRONTEND_DIST_DIR));

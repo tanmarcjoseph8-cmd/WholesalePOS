@@ -10,6 +10,14 @@ Returns service status and timestamp.
 
 ## Authentication
 
+`GET /auth/setup`
+
+Returns whether the local database still needs its first owner account.
+
+`POST /auth/setup`
+
+Creates the first owner account only when no active users exist. This endpoint creates the default store, warehouse, owner role, permissions, and a signed-in session.
+
 `POST /auth/login`
 
 Request:
@@ -70,7 +78,7 @@ Requires an `Authorization: Bearer <accessToken>` header and returns the current
 
 ## Products
 
-All product endpoints require `Authorization: Bearer <accessToken>`.
+All product endpoints require `Authorization: Bearer <accessToken>` and the `products.manage` permission.
 
 `GET /products`
 
@@ -94,7 +102,7 @@ Soft-deletes the product by setting `deletedAt` and marking it inactive. Product
 
 ## Inventory
 
-All inventory endpoints require `Authorization: Bearer <accessToken>`.
+All inventory endpoints require `Authorization: Bearer <accessToken>` and the `inventory.manage` permission.
 
 `GET /inventory/stock`
 
@@ -115,3 +123,30 @@ Sets stock to a counted quantity and stores the signed adjustment delta permanen
 `POST /inventory/transfers`
 
 Transfers stock between warehouses in one database transaction. The API writes paired transfer movement rows and publishes local inventory update events.
+
+## Users
+
+All user endpoints require `Authorization: Bearer <accessToken>` and the `users.manage` permission.
+
+`GET /users`
+
+Returns active and inactive non-deleted users with role and status details.
+
+`POST /users`
+
+Creates an administrator or cashier account.
+
+Request:
+
+```json
+{
+  "name": "Cashier One",
+  "email": "cashier@example.com",
+  "password": "strong-password",
+  "role": "CASHIER"
+}
+```
+
+`PATCH /users/:id`
+
+Updates a user's name, role, status, or password. User changes are audited.

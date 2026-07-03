@@ -19,6 +19,20 @@ const userSchema = z.object({
   storeId: z.string().nullable()
 });
 
+const currentUserSchema = userSchema.extend({
+  permissions: z.array(z.string())
+});
+
+const managedUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.string(),
+  status: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.string()
+});
+
 const authSessionSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
@@ -55,6 +69,8 @@ const productListSchema = z.object({
 });
 
 export type AuthSession = z.infer<typeof authSessionSchema>;
+export type CurrentUser = z.infer<typeof currentUserSchema>;
+export type ManagedUser = z.infer<typeof managedUserSchema>;
 export type Product = z.infer<typeof productSchema>;
 
 export type ProductCreatePayload = {
@@ -143,6 +159,33 @@ export async function login(input: { email: string; password: string; rememberMe
   );
   saveSession(session);
   return session;
+}
+
+export async function fetchCurrentUser() {
+  return currentUserSchema.parse(await apiRequest("/api/auth/me"));
+}
+
+export async function fetchUsers() {
+  return z.array(managedUserSchema).parse(await apiRequest("/api/users"));
+}
+
+export async function createUser(input: { name: string; email: string; password: string; role: "ADMINISTRATOR" | "CASHIER" }) {
+  return managedUserSchema.parse(
+    await apiRequest("/api/users", {
+      method: "POST",
+      body: JSON.stringify(input)
+    })
+  );
+}
+
+export async function updateUser(input: { id: string; name?: string; status?: "ACTIVE" | "INACTIVE"; role?: "ADMINISTRATOR" | "CASHIER"; password?: string }) {
+  const { id, ...body } = input;
+  return managedUserSchema.parse(
+    await apiRequest(`/api/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    })
+  );
 }
 
 export async function fetchProducts(search: string) {
