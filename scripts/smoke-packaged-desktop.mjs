@@ -1,0 +1,225 @@
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function findReleaseDirectory() {
+  if (process.env.WHOLESALEPOS_RELEASE_DIR) {
+    return path.resolve(process.env.WHOLESALEPOS_RELEASE_DIR);
+  }
+
+  const desktopDirectory = path.join(root, "desktop");
+  const releases = fs
+    .readdirSync(desktopDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("release"))
+    .map((entry) => path.join(desktopDirectory, entry.name, "win-unpacked"))
+    .filter((candidate) => fs.existsSync(path.join(candidate, "resources", "app")))
+    .map((candidate) => ({ path: candidate, updatedAt: fs.statSync(candidate).mtimeMs }))
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+
+  const [latest] = releases;
+  if (!latest) {
+    throw new Error("No packaged desktop release was found. Run `pnpm desktop:package:win` first.");
+  }
+
+  return latest.path;
+}
+
+function requestJson(port, pathname, options = {}) {
+  const body = options.body ? JSON.stringify(options.body) : undefined;
+
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: pathname,
+        method: options.method ?? "GET",
+        timeout: 2_500,
+        headers: {
+          Accept: "application/json",
+          ...(body ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } : {}),
+          ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
+        }
+      },
+      (response) => {
+        let data = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
+        response.on("end", () => {
+          const parsed = data ? JSON.parse(data) : null;
+          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+            resolve(parsed);
+            return;
+          }
+          reject(new Error(parsed?.message ?? `Request failed with status ${response.statusCode ?? "unknown"}.`));
+        });
+      }
+    );
+
+    request.on("error", reject);
+    request.on("timeout", () => {
+      request.destroy(new Error("Request timed out."));
+    });
+
+    if (body) request.write(body);
+    request.end();
+  });
+}
+
+function findAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (typeof address === "object" && address?.port) {
+          resolve(address.port);
+          return;
+        }
+        reject(new Error("Could not reserve a smoke-test port."));
+      });
+    });
+  });
+}
+
+function runCommand(command, args, env, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, env, stdio: "inherit", windowsHide: true });
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${path.basename(command)} exited with code ${code ?? "unknown"}.`));
+    });
+  });
+}
+
+async function waitForBackend(port, backendProcess) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 20_000) {
+    if (backendProcess.exitCode !== null) {
+      throw new Error(`Backend exited before becoming ready with code ${backendProcess.exitCode}.`);
+    }
+
+    try {
+      const health = await requestJson(port, "/api/health");
+      if (health?.status === "ok") return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+
+  throw new Error("Packaged backend did not become ready in time.");
+}
+
+function stopBackend(backendProcess) {
+  if (!backendProcess || backendProcess.exitCode !== null) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, 5_000);
+    backendProcess.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    backendProcess.kill();
+  });
+}
+
+const releaseDirectory = findReleaseDirectory();
+const appRoot = path.join(releaseDirectory, "resources", "app");
+const nodeRuntime = path.join(appRoot, "app-assets", "runtime", process.platform === "win32" ? "node.exe" : "node");
+const prismaCli = path.join(appRoot, "node_modules", "prisma", "build", "index.js");
+const schemaPath = path.join(appRoot, "app-assets", "backend", "prisma", "schema.prisma");
+const backendEntry = path.join(appRoot, "app-assets", "backend", "dist", "server.js");
+const frontendDist = path.join(appRoot, "app-assets", "frontend", "dist");
+const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "wholesalepos-packaged-smoke-"));
+const databasePath = path.join(tempDirectory, "wholesalepos.sqlite");
+fs.closeSync(fs.openSync(databasePath, "a"));
+
+const databaseUrl = `file:${databasePath.replace(/\\/g, "/")}`;
+const port = await findAvailablePort();
+const env = {
+  ...process.env,
+  NODE_ENV: "production",
+  PORT: String(port),
+  DATABASE_URL: databaseUrl,
+  FRONTEND_DIST_DIR: frontendDist,
+  CORS_ORIGIN: `http://127.0.0.1:${port}`,
+  JWT_ACCESS_SECRET: "packaged-smoke-access-secret-000000000000000000000000000000",
+  JWT_REFRESH_SECRET: "packaged-smoke-refresh-secret-0000000000000000000000000000"
+};
+
+let backendProcess;
+try {
+  await runCommand(nodeRuntime, [prismaCli, "migrate", "deploy", "--schema", schemaPath], env, appRoot);
+  backendProcess = spawn(nodeRuntime, [backendEntry], { env, stdio: "inherit", windowsHide: true });
+  await waitForBackend(port, backendProcess);
+
+  const setupStatus = await requestJson(port, "/api/auth/setup");
+  if (!setupStatus?.requiresSetup) {
+    throw new Error("A fresh smoke-test database should require setup.");
+  }
+
+  const session = await requestJson(port, "/api/auth/setup", {
+    method: "POST",
+    body: {
+      name: "Smoke Owner",
+      email: "owner@example.com",
+      password: "strongpassword123",
+      storeName: "Smoke Store"
+    }
+  });
+
+  const product = await requestJson(port, "/api/products", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      sku: "SMOKE-001",
+      name: "Smoke Test Product",
+      description: null,
+      imageUrl: null,
+      brand: "Smoke",
+      categoryId: null,
+      supplierId: null,
+      inventoryUnit: "PIECE",
+      sellingUnit: "PIECE",
+      unitRatioToBase: 1,
+      costPrice: 10,
+      retailPrice: 15,
+      wholesalePrice: 12,
+      vipPrice: 12,
+      taxRate: 0,
+      minimumStock: 1,
+      maximumStock: null,
+      status: "ACTIVE",
+      expiresAt: null,
+      batchNumber: null,
+      location: null,
+      notes: null,
+      barcodes: [{ value: "123456789012", isPrimary: true }]
+    }
+  });
+
+  const list = await requestJson(port, "/api/products?pageSize=10", { token: session.accessToken });
+  if (product?.name !== "Smoke Test Product" || !Array.isArray(list?.items) || list.items.length !== 1) {
+    throw new Error("Packaged product persistence smoke test failed.");
+  }
+
+  console.info("Packaged desktop smoke test passed.");
+} finally {
+  await stopBackend(backendProcess);
+  fs.rmSync(tempDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+}

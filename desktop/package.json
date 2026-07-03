@@ -2,6 +2,8 @@
   "name": "@wholesalepos/desktop",
   "version": "0.1.0",
   "private": true,
+  "description": "Offline Windows desktop shell for WholesalePOS.",
+  "author": "WholesalePOS",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
@@ -46,6 +48,9 @@
       "dist/**",
       "app-assets/**",
       "node_modules/.prisma/**",
+      "node_modules/@prisma/client/.prisma/**",
+      "node_modules/prisma/query-engine*.exe",
+      "node_modules/@prisma/engines/**",
       "package.json"
     ],
     "win": {

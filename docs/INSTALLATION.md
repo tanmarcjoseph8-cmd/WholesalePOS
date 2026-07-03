@@ -35,6 +35,12 @@ Create a downloadable Windows zip package:
 pnpm desktop:package:win
 ```
 
+Smoke-test the newest packaged Windows build:
+
+```bash
+pnpm desktop:smoke:win
+```
+
 The package output is written to `desktop/release/`. A separate NSIS installer command is available as `pnpm desktop:installer:win` for the later signed-installer milestone.
 
 ## Bootstrap Owner Account

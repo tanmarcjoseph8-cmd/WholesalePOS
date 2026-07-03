@@ -15,8 +15,10 @@
     "db:migrate": "pnpm --filter @wholesalepos/backend db:migrate",
     "desktop:build": "pnpm --filter @wholesalepos/desktop build",
     "desktop:dev": "pnpm --filter @wholesalepos/desktop dev",
+    "desktop:prepare": "node scripts/prepare-desktop-assets.mjs",
     "desktop:installer:win": "pnpm --filter @wholesalepos/desktop installer:win",
     "desktop:package:win": "pnpm --filter @wholesalepos/desktop package:win",
+    "desktop:smoke:win": "node scripts/smoke-packaged-desktop.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
