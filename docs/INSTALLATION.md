@@ -21,6 +21,22 @@ The database is created at `database/wholesalepos.sqlite`. Keep that file backed
 
 Use strong JWT secrets before running with real business data.
 
+## Desktop App Setup
+
+The desktop shell starts the backend locally, runs migrations, opens the built frontend in an app window, and stores the live database under the user's application data folder.
+
+```bash
+pnpm desktop:dev
+```
+
+Create a downloadable Windows zip package:
+
+```bash
+pnpm desktop:package:win
+```
+
+The package output is written to `desktop/release/`. A separate NSIS installer command is available as `pnpm desktop:installer:win` for the later signed-installer milestone.
+
 ## Bootstrap Owner Account
 
 After migrations complete, create the first owner account:

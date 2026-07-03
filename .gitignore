@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+release/
 .env
 .env.*
 !.env.example
@@ -15,6 +16,8 @@ database/*.sqlite-journal
 database/*.sqlite-wal
 database/*.sqlite-shm
 database/*.db
+desktop/app-assets/
+desktop/release/
 *.log
 .DS_Store
 Thumbs.db

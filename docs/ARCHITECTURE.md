@@ -6,7 +6,11 @@ WholesalePOS is now scoped as a single-device POS and inventory system. The appl
 
 The system does not need to coordinate live state across multiple cashiers, tablets, phones, or remote terminals. This keeps the product simpler to operate and reduces networking requirements for small shops.
 
-Data persists locally in `database/wholesalepos.sqlite`. That file is the durable day-to-day memory for products, stock, sales, users, and audit history.
+During development, data persists locally in `database/wholesalepos.sqlite`. In the desktop app, data persists under the user's application data folder. That SQLite file is the durable day-to-day memory for products, stock, sales, users, and audit history.
+
+## Desktop Runtime
+
+The Electron shell starts the built backend on `127.0.0.1`, runs Prisma migrations against the local SQLite database, serves the built frontend through the backend, and opens the app window against that local URL.
 
 ## Local Updates
 

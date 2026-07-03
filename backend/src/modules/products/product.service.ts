@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { publishRealtimeEvent } from "../../realtime/bus.js";
 import { realtimeEvents } from "../../realtime/events.js";

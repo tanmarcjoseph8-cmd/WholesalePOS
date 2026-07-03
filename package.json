@@ -13,6 +13,10 @@
     "lint": "pnpm -r lint",
     "db:generate": "pnpm --filter @wholesalepos/backend db:generate",
     "db:migrate": "pnpm --filter @wholesalepos/backend db:migrate",
+    "desktop:build": "pnpm --filter @wholesalepos/desktop build",
+    "desktop:dev": "pnpm --filter @wholesalepos/desktop dev",
+    "desktop:installer:win": "pnpm --filter @wholesalepos/desktop installer:win",
+    "desktop:package:win": "pnpm --filter @wholesalepos/desktop package:win",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

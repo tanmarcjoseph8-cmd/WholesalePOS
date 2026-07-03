@@ -12,6 +12,7 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL: z.string().default("30d"),
   CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
+  FRONTEND_DIST_DIR: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5)

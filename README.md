@@ -1,6 +1,6 @@
 # WholesalePOS Enterprise
 
-WholesalePOS Enterprise is a production-grade wholesale and retail point-of-sale and inventory platform for a single primary device. The repository is organized as a full-stack TypeScript monorepo with a React frontend, Express backend, local SQLite database, Prisma ORM, local update events, and a documentation set intended for operators and developers.
+WholesalePOS Enterprise is a production-grade wholesale and retail point-of-sale and inventory platform for a single primary device. The repository is organized as a full-stack TypeScript monorepo with a React frontend, Express backend, Electron desktop shell, local SQLite database, Prisma ORM, local update events, and a documentation set intended for operators and developers.
 
 ## Current Milestone
 
@@ -11,6 +11,7 @@ Milestone 1 establishes the runnable project foundation:
 - Local SQLite schema baseline covering stores, warehouses, users, roles, permissions, products, prices, inventory movements, sales, purchase orders, customers, suppliers, sessions, and audit logs.
 - Frontend React/Vite shell with responsive dashboard, dark/light theme support, API health integration, and production UI structure.
 - Local persistent database file for day-to-day use without Docker or a separate database server.
+- Electron desktop shell that starts the local backend, runs migrations, serves the built frontend, and prepares Windows installer packaging.
 - Verification scripts and starter tests for authentication and unit conversion logic.
 
 ## Quick Start
@@ -53,6 +54,22 @@ Milestone 1 establishes the runnable project foundation:
 Frontend: `http://localhost:5173`  
 Backend: `http://localhost:4000`
 
+## Desktop App
+
+Build and open the local desktop shell:
+
+```bash
+pnpm desktop:dev
+```
+
+Build a downloadable Windows zip package:
+
+```bash
+pnpm desktop:package:win
+```
+
+The desktop app stores its day-to-day database under the user's application data folder, not in the Git repository.
+
 ## Verification
 
 Run the full local verification suite:
@@ -64,5 +81,5 @@ pnpm verify
 The milestone commit message for the current local persistence milestone is:
 
 ```text
-feat(database): use local SQLite persistence
+feat(desktop): add local Windows app shell
 ```

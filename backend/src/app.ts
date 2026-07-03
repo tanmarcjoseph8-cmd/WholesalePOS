@@ -2,6 +2,8 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
 import helmet from "helmet";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error-handler.js";
@@ -29,6 +31,18 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/inventory", inventoryRouter);
   app.use("/api/products", productRouter);
+
+  if (env.FRONTEND_DIST_DIR && fs.existsSync(env.FRONTEND_DIST_DIR)) {
+    app.use(express.static(env.FRONTEND_DIST_DIR));
+    app.get("*", (_request, response, next) => {
+      const indexPath = path.join(env.FRONTEND_DIST_DIR as string, "index.html");
+      if (!fs.existsSync(indexPath)) {
+        next();
+        return;
+      }
+      response.sendFile(indexPath);
+    });
+  }
 
   app.use(errorHandler);
 
