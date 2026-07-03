@@ -17,7 +17,7 @@ database/*.sqlite-wal
 database/*.sqlite-shm
 database/*.db
 desktop/app-assets/
-desktop/release/
+desktop/release*/
 *.log
 .DS_Store
 Thumbs.db

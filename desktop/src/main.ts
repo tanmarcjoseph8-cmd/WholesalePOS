@@ -5,7 +5,9 @@ import net from "node:net";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { app, BrowserWindow, dialog } from "electron";
-import { autoUpdater } from "electron-updater";
+import electronUpdater from "electron-updater";
+
+const { autoUpdater } = electronUpdater;
 
 type DesktopSecrets = {
   accessSecret: string;
