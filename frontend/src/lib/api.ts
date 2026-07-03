@@ -68,10 +68,59 @@ const productListSchema = z.object({
   })
 });
 
+const warehouseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  storeId: z.string()
+});
+
+const inventoryStockSchema = z.object({
+  id: z.string(),
+  productId: z.string(),
+  warehouseId: z.string(),
+  quantity: z.coerce.number(),
+  product: z.object({
+    id: z.string(),
+    sku: z.string(),
+    name: z.string(),
+    minimumStock: z.coerce.number(),
+    inventoryUnit: z.string()
+  }),
+  warehouse: warehouseSchema
+});
+
+const inventoryMovementSchema = z.object({
+  id: z.string(),
+  productId: z.string(),
+  warehouseId: z.string(),
+  type: z.string(),
+  quantity: z.coerce.number(),
+  unitCost: z.coerce.number().nullable(),
+  reason: z.string().nullable(),
+  createdAt: z.string(),
+  product: z.object({ id: z.string(), sku: z.string(), name: z.string() }),
+  warehouse: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  createdBy: z.object({ id: z.string(), name: z.string(), email: z.string() }).nullable()
+});
+
+const paginatedStockSchema = z.object({
+  items: z.array(inventoryStockSchema),
+  pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
+});
+
+const paginatedMovementsSchema = z.object({
+  items: z.array(inventoryMovementSchema),
+  pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
+});
+
 export type AuthSession = z.infer<typeof authSessionSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type ManagedUser = z.infer<typeof managedUserSchema>;
 export type Product = z.infer<typeof productSchema>;
+export type Warehouse = z.infer<typeof warehouseSchema>;
+export type InventoryStock = z.infer<typeof inventoryStockSchema>;
+export type InventoryMovement = z.infer<typeof inventoryMovementSchema>;
 
 export type ProductCreatePayload = {
   sku: string;
@@ -192,6 +241,47 @@ export async function fetchProducts(search: string) {
   const query = new URLSearchParams({ pageSize: "50" });
   if (search.trim()) query.set("search", search.trim());
   return productListSchema.parse(await apiRequest(`/api/products?${query.toString()}`));
+}
+
+export async function fetchWarehouses() {
+  return z.array(warehouseSchema).parse(await apiRequest("/api/inventory/warehouses"));
+}
+
+export async function fetchStock(search: string, lowStockOnly = false) {
+  const query = new URLSearchParams({ pageSize: "100", lowStockOnly: String(lowStockOnly) });
+  if (search.trim()) query.set("search", search.trim());
+  return paginatedStockSchema.parse(await apiRequest(`/api/inventory/stock?${query.toString()}`));
+}
+
+export async function fetchInventoryMovements(productId?: string) {
+  const query = new URLSearchParams({ pageSize: "50" });
+  if (productId) query.set("productId", productId);
+  return paginatedMovementsSchema.parse(await apiRequest(`/api/inventory/movements?${query.toString()}`));
+}
+
+export async function createInventoryMovement(input: {
+  productId: string;
+  warehouseId: string;
+  type: "STOCK_IN" | "STOCK_OUT" | "DAMAGE" | "RETURN" | "PURCHASE_RECEIPT";
+  quantity: number;
+  unitCost?: number | null;
+  reason: string;
+}) {
+  return apiRequest("/api/inventory/movements", {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      referenceType: "ManualInventory",
+      referenceId: null
+    })
+  });
+}
+
+export async function adjustInventoryCount(input: { productId: string; warehouseId: string; countedQuantity: number; reason: string }) {
+  return apiRequest("/api/inventory/counts", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export async function createProduct(input: ProductCreatePayload) {

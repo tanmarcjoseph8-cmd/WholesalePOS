@@ -7,6 +7,7 @@ import {
   createInventoryMovement,
   listMovements,
   listStock,
+  listWarehouses,
   transferInventory
 } from "./inventory.service.js";
 import {
@@ -21,6 +22,13 @@ export const inventoryRouter = Router();
 
 inventoryRouter.use(requireAuth);
 inventoryRouter.use(requirePermission("inventory.manage"));
+
+inventoryRouter.get(
+  "/warehouses",
+  asyncHandler(async (_request, response) => {
+    response.json(await listWarehouses());
+  })
+);
 
 inventoryRouter.get(
   "/stock",

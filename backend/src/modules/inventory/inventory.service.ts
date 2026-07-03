@@ -49,6 +49,14 @@ async function assertProductAndWarehouse(productId: string, warehouseId: string)
   return { product, warehouse };
 }
 
+export async function listWarehouses() {
+  return prisma.warehouse.findMany({
+    where: { deletedAt: null },
+    select: { id: true, name: true, code: true, storeId: true },
+    orderBy: [{ code: "asc" }, { name: "asc" }]
+  });
+}
+
 export async function listStock(query: InventoryListQuery) {
   const { page, pageSize, skip, take } = getPagination(query);
   const where: Prisma.InventoryStockWhereInput = {

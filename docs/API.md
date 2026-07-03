@@ -104,6 +104,10 @@ Soft-deletes the product by setting `deletedAt` and marking it inactive. Product
 
 All inventory endpoints require `Authorization: Bearer <accessToken>` and the `inventory.manage` permission.
 
+`GET /inventory/warehouses`
+
+Returns active warehouses for stock receiving, movement, and adjustment screens.
+
 `GET /inventory/stock`
 
 Returns paginated stock balances by product and warehouse. Supports `page`, `pageSize`, `productId`, `warehouseId`, `search`, and `lowStockOnly`.

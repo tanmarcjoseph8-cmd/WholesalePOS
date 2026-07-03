@@ -1,7 +1,16 @@
 import { Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createProduct, fetchProducts, type ProductCreatePayload } from "../lib/api";
+import {
+  adjustInventoryCount,
+  createInventoryMovement,
+  createProduct,
+  fetchInventoryMovements,
+  fetchProducts,
+  fetchStock,
+  fetchWarehouses,
+  type ProductCreatePayload
+} from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 
 const emptyProduct: ProductCreatePayload = {
@@ -20,10 +29,24 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [product, setProduct] = useState<ProductCreatePayload>(emptyProduct);
+  const [stockForm, setStockForm] = useState({
+    productId: "",
+    warehouseId: "",
+    type: "STOCK_IN" as "STOCK_IN" | "STOCK_OUT" | "DAMAGE" | "RETURN" | "PURCHASE_RECEIPT" | "COUNT",
+    quantity: 0,
+    unitCost: 0,
+    reason: "Manual stock update"
+  });
   const products = useQuery({
     queryKey: ["products", search],
     queryFn: () => fetchProducts(search)
   });
+  const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
+  const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
+  const lowStock = useQuery({ queryKey: ["stock", "low"], queryFn: () => fetchStock("", true) });
+  const movements = useQuery({ queryKey: ["inventory-movements"], queryFn: () => fetchInventoryMovements() });
+  const defaultWarehouseId = warehouses.data?.[0]?.id ?? "";
+  const selectedWarehouseId = stockForm.warehouseId || defaultWarehouseId;
 
   const createMutation = useMutation({
     mutationFn: createProduct,
@@ -31,6 +54,34 @@ export function InventoryPage() {
       setProduct(emptyProduct);
       setIsAdding(false);
       await queryClient.invalidateQueries({ queryKey: ["products"] });
+    }
+  });
+  const stockMutation = useMutation({
+    mutationFn: async () => {
+      if (stockForm.type === "COUNT") {
+        return adjustInventoryCount({
+          productId: stockForm.productId,
+          warehouseId: selectedWarehouseId,
+          countedQuantity: stockForm.quantity,
+          reason: stockForm.reason
+        });
+      }
+
+      return createInventoryMovement({
+        productId: stockForm.productId,
+        warehouseId: selectedWarehouseId,
+        type: stockForm.type,
+        quantity: stockForm.quantity,
+        unitCost: stockForm.type === "STOCK_IN" || stockForm.type === "PURCHASE_RECEIPT" ? stockForm.unitCost : null,
+        reason: stockForm.reason
+      });
+    },
+    onSuccess: async () => {
+      setStockForm((current) => ({ ...current, quantity: 0, unitCost: 0, reason: "Manual stock update" }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory-movements"] })
+      ]);
     }
   });
 
@@ -41,7 +92,9 @@ export function InventoryPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">Inventory Control</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{productCount} products saved on this device.</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {productCount} products saved on this device. {lowStock.data?.pagination.total ?? 0} low-stock alerts.
+          </p>
         </div>
         <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ocean px-4 py-2 text-sm font-bold text-white" onClick={() => setIsAdding(true)}>
           <Plus size={18} />
@@ -157,6 +210,97 @@ export function InventoryPage() {
         </form>
       ) : null}
 
+      <form
+        className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2 xl:grid-cols-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          stockMutation.mutate();
+        }}
+      >
+        <label className="text-sm font-semibold xl:col-span-2">
+          Product
+          <select
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            value={stockForm.productId}
+            onChange={(event) => setStockForm((current) => ({ ...current, productId: event.target.value }))}
+            required
+          >
+            <option value="">Select product</option>
+            {products.data?.items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} ({item.sku})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-semibold">
+          Warehouse
+          <select
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            value={selectedWarehouseId}
+            onChange={(event) => setStockForm((current) => ({ ...current, warehouseId: event.target.value }))}
+            required
+          >
+            {warehouses.data?.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm font-semibold">
+          Action
+          <select
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            value={stockForm.type}
+            onChange={(event) => setStockForm((current) => ({ ...current, type: event.target.value as typeof stockForm.type }))}
+          >
+            <option value="STOCK_IN">Add stock</option>
+            <option value="STOCK_OUT">Remove stock</option>
+            <option value="COUNT">Set counted stock</option>
+            <option value="DAMAGE">Mark damaged</option>
+            <option value="RETURN">Customer return</option>
+            <option value="PURCHASE_RECEIPT">Purchase receipt</option>
+          </select>
+        </label>
+        <label className="text-sm font-semibold">
+          Quantity
+          <input
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            type="number"
+            min="0"
+            step="0.001"
+            value={stockForm.quantity}
+            onChange={(event) => setStockForm((current) => ({ ...current, quantity: Number(event.target.value) }))}
+            required
+          />
+        </label>
+        <label className="text-sm font-semibold">
+          Unit cost
+          <input
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            type="number"
+            min="0"
+            step="0.01"
+            value={stockForm.unitCost}
+            onChange={(event) => setStockForm((current) => ({ ...current, unitCost: Number(event.target.value) }))}
+          />
+        </label>
+        <label className="text-sm font-semibold md:col-span-2 xl:col-span-5">
+          Reason
+          <input
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            value={stockForm.reason}
+            onChange={(event) => setStockForm((current) => ({ ...current, reason: event.target.value }))}
+            required
+          />
+        </label>
+        <button className="focus-ring mt-7 h-11 rounded-md bg-mint px-4 text-sm font-bold text-white" disabled={stockMutation.isPending || !selectedWarehouseId}>
+          {stockMutation.isPending ? "Saving..." : "Save Stock"}
+        </button>
+        {stockMutation.error ? <p className="rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose md:col-span-2 xl:col-span-6">{stockMutation.error.message}</p> : null}
+      </form>
+
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -199,6 +343,81 @@ export function InventoryPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+            <h3 className="font-bold">Stock Balances</h3>
+          </div>
+          <table className="w-full min-w-[620px] text-left text-sm">
+            <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <tr>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Warehouse</th>
+                <th className="px-4 py-3">Quantity</th>
+                <th className="px-4 py-3">Alert</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stock.data?.items.length ? (
+                stock.data.items.map((item) => {
+                  const isLow = item.quantity <= item.product.minimumStock;
+                  return (
+                    <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="px-4 py-3 font-semibold">{item.product.name}</td>
+                      <td className="px-4 py-3">{item.warehouse.name}</td>
+                      <td className="px-4 py-3">
+                        {item.quantity} {item.product.inventoryUnit.toLowerCase()}
+                      </td>
+                      <td className="px-4 py-3">{isLow ? (item.quantity <= 0 ? "Out of stock" : "Low stock") : "OK"}</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={4}>
+                    No stock balances yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+            <h3 className="font-bold">Stock History</h3>
+          </div>
+          <table className="w-full min-w-[620px] text-left text-sm">
+            <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <tr>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movements.data?.items.length ? (
+                movements.data.items.map((item) => (
+                  <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="px-4 py-3">{new Date(item.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 font-semibold">{item.product.name}</td>
+                    <td className="px-4 py-3">{item.type}</td>
+                    <td className="px-4 py-3">{item.quantity}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={4}>
+                    No stock movement history yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
       </div>
     </section>
   );
