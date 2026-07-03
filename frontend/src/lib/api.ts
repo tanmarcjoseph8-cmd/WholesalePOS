@@ -284,6 +284,16 @@ export async function adjustInventoryCount(input: { productId: string; warehouse
   });
 }
 
+export async function createSale(input: {
+  items: Array<{ productId: string; warehouseId: string; quantity: number; unitPrice: number; discount: number }>;
+  payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
+}) {
+  return apiRequest("/api/sales", {
+    method: "POST",
+    body: JSON.stringify({ customerId: null, ...input })
+  });
+}
+
 export async function createProduct(input: ProductCreatePayload) {
   const barcodes = input.barcode?.trim() ? [{ value: input.barcode.trim(), isPrimary: true }] : [];
   return productSchema.parse(

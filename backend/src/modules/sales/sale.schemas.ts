@@ -1,0 +1,33 @@
+import { z } from "zod";
+
+export const saleCreateSchema = z.object({
+  customerId: z.string().trim().min(1).optional().nullable(),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1),
+        warehouseId: z.string().trim().min(1),
+        quantity: z.coerce.number().finite().positive().max(999_999_999.999999),
+        unitPrice: z.coerce.number().finite().min(0).max(999_999_999.99).optional(),
+        discount: z.coerce.number().finite().min(0).max(999_999_999.99).default(0)
+      })
+    )
+    .min(1),
+  payments: z
+    .array(
+      z.object({
+        method: z.enum(["CASH", "GCASH"]),
+        amount: z.coerce.number().finite().positive().max(999_999_999.99),
+        reference: z.string().trim().min(1).max(120).optional().nullable()
+      })
+    )
+    .min(1)
+});
+
+export const saleListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(25)
+});
+
+export type SaleCreateInput = z.infer<typeof saleCreateSchema>;
+export type SaleListQuery = z.infer<typeof saleListQuerySchema>;

@@ -28,6 +28,10 @@ export const requireAuth: RequestHandler = (request, _response, next) => {
 };
 
 export function requirePermission(permissionKey: string): RequestHandler {
+  return requireAnyPermission([permissionKey]);
+}
+
+export function requireAnyPermission(permissionKeys: string[]): RequestHandler {
   return async (request, _response, next) => {
     try {
       const auth = getRequestAuth(request);
@@ -39,7 +43,7 @@ export function requirePermission(permissionKey: string): RequestHandler {
       const allowed = await prisma.rolePermission.findFirst({
         where: {
           roleId: auth.roleId,
-          permission: { key: permissionKey }
+          permission: { key: { in: permissionKeys } }
         },
         select: { roleId: true }
       });

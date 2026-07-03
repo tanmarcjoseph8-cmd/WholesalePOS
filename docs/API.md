@@ -154,3 +154,39 @@ Request:
 `PATCH /users/:id`
 
 Updates a user's name, role, status, or password. User changes are audited.
+
+## Sales
+
+All sales endpoints require `Authorization: Bearer <accessToken>` and the `sales.manage` permission.
+
+`GET /sales`
+
+Returns paginated completed sales with cashier, items, and payments.
+
+`POST /sales`
+
+Completes a sale in one transaction. The API creates a receipt number, sale items, sale payments, stock deductions, inventory movement rows, and an audit log.
+
+Request:
+
+```json
+{
+  "customerId": null,
+  "items": [
+    {
+      "productId": "product-id",
+      "warehouseId": "warehouse-id",
+      "quantity": 2,
+      "unitPrice": 50,
+      "discount": 0
+    }
+  ],
+  "payments": [
+    {
+      "method": "CASH",
+      "amount": 100,
+      "reference": null
+    }
+  ]
+}
+```
