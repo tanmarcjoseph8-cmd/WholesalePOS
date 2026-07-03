@@ -9,6 +9,103 @@ const healthSchema = z.object({
 export type ApiHealth = z.infer<typeof healthSchema>;
 
 const apiUrl = import.meta.env.VITE_API_URL ?? "";
+const sessionKey = "wholesalepos.session";
+
+const userSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.string(),
+  storeId: z.string().nullable()
+});
+
+const authSessionSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  user: userSchema
+});
+
+const setupStatusSchema = z.object({
+  requiresSetup: z.boolean()
+});
+
+const productSchema = z.object({
+  id: z.string(),
+  sku: z.string(),
+  name: z.string(),
+  brand: z.string().nullable(),
+  inventoryUnit: z.string(),
+  sellingUnit: z.string(),
+  retailPrice: z.coerce.number(),
+  wholesalePrice: z.coerce.number(),
+  costPrice: z.coerce.number(),
+  minimumStock: z.coerce.number(),
+  status: z.string(),
+  barcodes: z.array(z.object({ id: z.string(), value: z.string(), isPrimary: z.boolean() })).default([])
+});
+
+const productListSchema = z.object({
+  items: z.array(productSchema),
+  pagination: z.object({
+    page: z.number(),
+    pageSize: z.number(),
+    total: z.number(),
+    totalPages: z.number()
+  })
+});
+
+export type AuthSession = z.infer<typeof authSessionSchema>;
+export type Product = z.infer<typeof productSchema>;
+
+export type ProductCreatePayload = {
+  sku: string;
+  name: string;
+  brand?: string | null;
+  barcode?: string | null;
+  costPrice: number;
+  retailPrice: number;
+  wholesalePrice: number;
+  minimumStock: number;
+};
+
+function getStoredSession() {
+  const rawSession = window.localStorage.getItem(sessionKey);
+  if (!rawSession) return null;
+  const parsed = authSessionSchema.safeParse(JSON.parse(rawSession));
+  return parsed.success ? parsed.data : null;
+}
+
+export function loadSession() {
+  return getStoredSession();
+}
+
+export function saveSession(session: AuthSession) {
+  window.localStorage.setItem(sessionKey, JSON.stringify(session));
+}
+
+export function clearSession() {
+  window.localStorage.removeItem(sessionKey);
+}
+
+async function apiRequest(path: string, options: RequestInit = {}) {
+  const session = getStoredSession();
+  const response = await fetch(`${apiUrl}${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(session ? { Authorization: `Bearer ${session.accessToken}` } : {}),
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? "The request failed.");
+  }
+
+  return response.json();
+}
 
 export async function fetchHealth(): Promise<ApiHealth> {
   const response = await fetch(`${apiUrl}/api/health`, {
@@ -20,4 +117,70 @@ export async function fetchHealth(): Promise<ApiHealth> {
   }
 
   return healthSchema.parse(await response.json());
+}
+
+export async function fetchSetupStatus() {
+  return setupStatusSchema.parse(await apiRequest("/api/auth/setup"));
+}
+
+export async function setupOwner(input: { name: string; email: string; password: string; storeName: string }) {
+  const session = authSessionSchema.parse(
+    await apiRequest("/api/auth/setup", {
+      method: "POST",
+      body: JSON.stringify(input)
+    })
+  );
+  saveSession(session);
+  return session;
+}
+
+export async function login(input: { email: string; password: string; rememberMe: boolean }) {
+  const session = authSessionSchema.parse(
+    await apiRequest("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(input)
+    })
+  );
+  saveSession(session);
+  return session;
+}
+
+export async function fetchProducts(search: string) {
+  const query = new URLSearchParams({ pageSize: "50" });
+  if (search.trim()) query.set("search", search.trim());
+  return productListSchema.parse(await apiRequest(`/api/products?${query.toString()}`));
+}
+
+export async function createProduct(input: ProductCreatePayload) {
+  const barcodes = input.barcode?.trim() ? [{ value: input.barcode.trim(), isPrimary: true }] : [];
+  return productSchema.parse(
+    await apiRequest("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: input.sku,
+        name: input.name,
+        brand: input.brand?.trim() ? input.brand.trim() : null,
+        description: null,
+        imageUrl: null,
+        categoryId: null,
+        supplierId: null,
+        inventoryUnit: "PIECE",
+        sellingUnit: "PIECE",
+        unitRatioToBase: 1,
+        costPrice: input.costPrice,
+        retailPrice: input.retailPrice,
+        wholesalePrice: input.wholesalePrice,
+        vipPrice: input.wholesalePrice,
+        taxRate: 0,
+        minimumStock: input.minimumStock,
+        maximumStock: null,
+        status: "ACTIVE",
+        expiresAt: null,
+        batchNumber: null,
+        location: null,
+        notes: null,
+        barcodes
+      })
+    })
+  );
 }

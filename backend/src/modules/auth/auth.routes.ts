@@ -2,10 +2,31 @@ import { Router } from "express";
 import { loginRateLimit } from "../../middleware/rate-limit.js";
 import { validateBody } from "../../shared/validate.js";
 import { getRequestAuth, requireAuth } from "./auth.middleware.js";
-import { loginSchema, logoutSchema, refreshTokenSchema } from "./auth.schemas.js";
-import { getCurrentUser, login, logout, refreshSession } from "./auth.service.js";
+import { loginSchema, logoutSchema, refreshTokenSchema, setupOwnerSchema } from "./auth.schemas.js";
+import { getCurrentUser, getSetupStatus, login, logout, refreshSession, setupOwner } from "./auth.service.js";
 
 export const authRouter = Router();
+
+authRouter.get("/setup", async (_request, response, next) => {
+  try {
+    response.json(await getSetupStatus());
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/setup", loginRateLimit, validateBody(setupOwnerSchema), async (request, response, next) => {
+  try {
+    response.status(201).json(
+      await setupOwner(request.body, {
+        ipAddress: request.ip,
+        userAgent: request.get("user-agent")
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+});
 
 authRouter.post("/login", loginRateLimit, validateBody(loginSchema), async (request, response, next) => {
   try {

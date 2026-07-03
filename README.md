@@ -4,15 +4,14 @@ WholesalePOS Enterprise is a production-grade wholesale and retail point-of-sale
 
 ## Current Milestone
 
-Milestone 1 establishes the runnable project foundation:
+The current milestone makes the desktop app usable for first-run local inventory work:
 
-- Enterprise folder structure with separate frontend, backend, database, docker, docs, tests, scripts, and uploads areas.
-- Backend TypeScript API foundation with Express, Zod validation, JWT authentication services, security middleware, audit logging, Prisma integration, and local update-event wiring.
-- Local SQLite schema baseline covering stores, warehouses, users, roles, permissions, products, prices, inventory movements, sales, purchase orders, customers, suppliers, sessions, and audit logs.
-- Frontend React/Vite shell with responsive dashboard, dark/light theme support, API health integration, and production UI structure.
-- Local persistent database file for day-to-day use without Docker or a separate database server.
-- Electron desktop shell that starts the local backend, runs migrations, serves the built frontend, and prepares Windows installer packaging.
-- Verification scripts and starter tests for authentication and unit conversion logic.
+- First-run owner account setup from the app window.
+- Secure login with locally persisted session state.
+- Product creation and searchable product list in Inventory.
+- Local SQLite persistence under the user's application data folder.
+- Packaged Windows desktop runtime with Prisma's standalone query engine.
+- Verification scripts and smoke-tested Windows zip packaging.
 
 ## Quick Start
 
@@ -37,7 +36,7 @@ Milestone 1 establishes the runnable project foundation:
 
    The app stores day-to-day data in `database/wholesalepos.sqlite`.
 
-4. Bootstrap the owner account:
+4. Bootstrap the owner account for local development:
 
    ```powershell
    $env:ADMIN_EMAIL="owner@example.com"
@@ -70,6 +69,8 @@ pnpm desktop:package:win
 
 The desktop app stores its day-to-day database under the user's application data folder, not in the Git repository.
 
+On a fresh desktop install, the app opens to an owner setup screen. Create the owner account there, then use Inventory to add products. Products are saved locally and remain after the app is closed.
+
 ## Verification
 
 Run the full local verification suite:
@@ -78,8 +79,8 @@ Run the full local verification suite:
 pnpm verify
 ```
 
-The milestone commit message for the current local persistence milestone is:
+The milestone commit message for the current usable desktop milestone is:
 
 ```text
-feat(desktop): add local Windows app shell
+feat(desktop): add first-run setup and product inventory
 ```

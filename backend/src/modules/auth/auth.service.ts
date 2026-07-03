@@ -1,11 +1,164 @@
 import crypto from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/app-error.js";
-import type { LoginRequest, LogoutRequest, RefreshTokenRequest } from "./auth.schemas.js";
-import { verifyPassword } from "./password.service.js";
+import type { LoginRequest, LogoutRequest, RefreshTokenRequest, SetupOwnerRequest } from "./auth.schemas.js";
+import { hashPassword, verifyPassword } from "./password.service.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "./token.service.js";
 
 const refreshTokenHash = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
+
+const ownerPermissions = [
+  "dashboard.read",
+  "users.manage",
+  "roles.manage",
+  "products.manage",
+  "inventory.manage",
+  "sales.manage",
+  "purchase-orders.manage",
+  "customers.manage",
+  "suppliers.manage",
+  "reports.read",
+  "settings.manage",
+  "audit.read"
+];
+
+type TransactionClient = Prisma.TransactionClient;
+
+async function ensureOwnerRole(client: TransactionClient = prisma) {
+  const role = await client.role.upsert({
+    where: { name: "Owner" },
+    update: { description: "Full system access for the business owner." },
+    create: {
+      name: "Owner",
+      description: "Full system access for the business owner."
+    }
+  });
+
+  for (const key of ownerPermissions) {
+    const permission = await client.permission.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        description: key
+          .split(".")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ")
+      }
+    });
+
+    await client.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: role.id,
+          permissionId: permission.id
+        }
+      },
+      update: {},
+      create: {
+        roleId: role.id,
+        permissionId: permission.id
+      }
+    });
+  }
+
+  return role;
+}
+
+async function createSessionForUser(
+  user: { id: string; roleId: string; storeId: string | null; name: string; email: string; role: { name: string } },
+  input: { rememberMe: boolean },
+  metadata: { ipAddress?: string; userAgent?: string }
+) {
+  const subject = { userId: user.id, roleId: user.roleId, storeId: user.storeId };
+  const accessToken = signAccessToken(subject);
+  const refreshToken = signRefreshToken(subject);
+
+  await prisma.session.create({
+    data: {
+      userId: user.id,
+      refreshTokenHash: refreshTokenHash(refreshToken),
+      userAgent: metadata.userAgent,
+      ipAddress: metadata.ipAddress,
+      expiresAt: new Date(Date.now() + (input.rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role.name,
+      storeId: user.storeId
+    }
+  };
+}
+
+export async function getSetupStatus() {
+  const userCount = await prisma.user.count({ where: { deletedAt: null } });
+  return { requiresSetup: userCount === 0 };
+}
+
+export async function setupOwner(input: SetupOwnerRequest, metadata: { ipAddress?: string; userAgent?: string }) {
+  const existingUsers = await prisma.user.count({ where: { deletedAt: null } });
+  if (existingUsers > 0) {
+    throw new AppError(409, "SETUP_ALREADY_COMPLETED", "The owner account has already been created.");
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  const user = await prisma.$transaction(async (transaction) => {
+    const store = await transaction.store.upsert({
+      where: { id: "default-store" },
+      update: { name: input.storeName },
+      create: {
+        id: "default-store",
+        name: input.storeName,
+        currency: "PHP"
+      }
+    });
+
+    await transaction.warehouse.upsert({
+      where: { storeId_code: { storeId: store.id, code: "MAIN" } },
+      update: { name: "Main Warehouse" },
+      create: {
+        storeId: store.id,
+        code: "MAIN",
+        name: "Main Warehouse"
+      }
+    });
+
+    const role = await ensureOwnerRole(transaction);
+    const createdUser = await transaction.user.create({
+      data: {
+        email: input.email,
+        name: input.name,
+        roleId: role.id,
+        storeId: store.id,
+        passwordHash,
+        status: "ACTIVE"
+      },
+      include: { role: true }
+    });
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: createdUser.id,
+        action: "OWNER_SETUP_COMPLETED",
+        entityType: "User",
+        entityId: createdUser.id,
+        metadata: { email: createdUser.email, storeName: store.name }
+      }
+    });
+
+    return createdUser;
+  });
+
+  return createSessionForUser(user, { rememberMe: true }, metadata);
+}
 
 export async function login(input: LoginRequest, metadata: { ipAddress?: string; userAgent?: string }) {
   const user = await prisma.user.findUnique({
@@ -33,31 +186,7 @@ export async function login(input: LoginRequest, metadata: { ipAddress?: string;
     throw new AppError(401, "INVALID_CREDENTIALS", "Invalid email or password.");
   }
 
-  const subject = { userId: user.id, roleId: user.roleId, storeId: user.storeId };
-  const accessToken = signAccessToken(subject);
-  const refreshToken = signRefreshToken(subject);
-
-  await prisma.session.create({
-    data: {
-      userId: user.id,
-      refreshTokenHash: refreshTokenHash(refreshToken),
-      userAgent: metadata.userAgent,
-      ipAddress: metadata.ipAddress,
-      expiresAt: new Date(Date.now() + (input.rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000)
-    }
-  });
-
-  return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role.name,
-      storeId: user.storeId
-    }
-  };
+  return createSessionForUser(user, input, metadata);
 }
 
 export async function refreshSession(input: RefreshTokenRequest, metadata: { ipAddress?: string; userAgent?: string }) {
