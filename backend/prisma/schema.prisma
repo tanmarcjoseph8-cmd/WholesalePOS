@@ -3,70 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-}
-
-enum ProductStatus {
-  ACTIVE
-  INACTIVE
-  DISCONTINUED
-}
-
-enum UnitType {
-  KILOGRAM
-  GRAM
-  LITER
-  MILLILITER
-  METER
-  CENTIMETER
-  PIECE
-  PACK
-  CASE
-  BUNDLE
-  BOTTLE
-  ROLL
-  CUSTOM
-}
-
-enum InventoryMovementType {
-  STOCK_IN
-  STOCK_OUT
-  ADJUSTMENT
-  DAMAGE
-  RETURN
-  TRANSFER
-  SALE
-  PURCHASE_RECEIPT
-}
-
-enum SaleStatus {
-  HELD
-  COMPLETED
-  REFUNDED
-  VOIDED
-}
-
-enum PaymentMethod {
-  CASH
-  CARD
-  GCASH
-  MAYA
-  BANK_TRANSFER
-  SPLIT
-}
-
-enum PurchaseOrderStatus {
-  DRAFT
-  APPROVED
-  PARTIALLY_RECEIVED
-  COMPLETED
-  CANCELLED
 }
 
 model Store {
@@ -136,7 +74,7 @@ model User {
   name         String
   email        String     @unique
   passwordHash String
-  status       UserStatus @default(ACTIVE)
+  status       String     @default("ACTIVE")
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -189,8 +127,8 @@ model Customer {
   email          String?
   phone          String?
   loyaltyPoints  Int       @default(0)
-  creditLimit    Decimal   @default(0) @db.Decimal(14, 2)
-  balance        Decimal   @default(0) @db.Decimal(14, 2)
+  creditLimit    Decimal   @default(0)
+  balance        Decimal   @default(0)
   birthday       DateTime?
   notes          String?
   createdAt      DateTime  @default(now())
@@ -227,17 +165,17 @@ model Product {
   description     String?
   imageUrl        String?
   brand           String?
-  inventoryUnit   UnitType
-  sellingUnit     UnitType
-  unitRatioToBase Decimal       @default(1) @db.Decimal(18, 6)
-  costPrice       Decimal       @db.Decimal(14, 2)
-  retailPrice     Decimal       @db.Decimal(14, 2)
-  wholesalePrice  Decimal       @db.Decimal(14, 2)
-  vipPrice        Decimal       @db.Decimal(14, 2)
-  taxRate         Decimal       @default(0) @db.Decimal(6, 4)
-  minimumStock    Decimal       @default(0) @db.Decimal(18, 6)
-  maximumStock    Decimal?      @db.Decimal(18, 6)
-  status          ProductStatus @default(ACTIVE)
+  inventoryUnit   String
+  sellingUnit     String
+  unitRatioToBase Decimal       @default(1)
+  costPrice       Decimal
+  retailPrice     Decimal
+  wholesalePrice  Decimal
+  vipPrice        Decimal
+  taxRate         Decimal       @default(0)
+  minimumStock    Decimal       @default(0)
+  maximumStock    Decimal?
+  status          String        @default("ACTIVE")
   expiresAt       DateTime?
   batchNumber     String?
   location        String?
@@ -275,7 +213,7 @@ model InventoryStock {
   id          String   @id @default(cuid())
   productId   String
   warehouseId String
-  quantity    Decimal  @default(0) @db.Decimal(18, 6)
+  quantity    Decimal  @default(0)
   updatedAt   DateTime @updatedAt
   product     Product  @relation(fields: [productId], references: [id])
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
@@ -288,9 +226,9 @@ model InventoryMovement {
   id              String                @id @default(cuid())
   productId       String
   warehouseId     String
-  type            InventoryMovementType
-  quantity        Decimal               @db.Decimal(18, 6)
-  unitCost        Decimal?              @db.Decimal(14, 2)
+  type            String
+  quantity        Decimal
+  unitCost        Decimal?
   referenceType   String?
   referenceId     String?
   reason          String?
@@ -309,8 +247,8 @@ model PriceHistory {
   id          String   @id @default(cuid())
   productId   String
   priceType   String
-  oldPrice    Decimal  @db.Decimal(14, 2)
-  newPrice    Decimal  @db.Decimal(14, 2)
+  oldPrice    Decimal
+  newPrice    Decimal
   changedById String?
   changedAt   DateTime @default(now())
   product     Product  @relation(fields: [productId], references: [id])
@@ -325,13 +263,13 @@ model Sale {
   cashierId     String
   customerId    String?
   receiptNumber String        @unique
-  status        SaleStatus    @default(COMPLETED)
-  subtotal      Decimal       @db.Decimal(14, 2)
-  discountTotal Decimal       @default(0) @db.Decimal(14, 2)
-  taxTotal      Decimal       @default(0) @db.Decimal(14, 2)
-  grandTotal    Decimal       @db.Decimal(14, 2)
-  paidTotal     Decimal       @db.Decimal(14, 2)
-  changeTotal   Decimal       @default(0) @db.Decimal(14, 2)
+  status        String        @default("COMPLETED")
+  subtotal      Decimal
+  discountTotal Decimal       @default(0)
+  taxTotal      Decimal       @default(0)
+  grandTotal    Decimal
+  paidTotal     Decimal
+  changeTotal   Decimal       @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
@@ -350,11 +288,11 @@ model SaleItem {
   id          String   @id @default(cuid())
   saleId      String
   productId   String
-  quantity    Decimal  @db.Decimal(18, 6)
-  unitPrice   Decimal  @db.Decimal(14, 2)
-  discount    Decimal  @default(0) @db.Decimal(14, 2)
-  taxAmount   Decimal  @default(0) @db.Decimal(14, 2)
-  lineTotal   Decimal  @db.Decimal(14, 2)
+  quantity    Decimal
+  unitPrice   Decimal
+  discount    Decimal  @default(0)
+  taxAmount   Decimal  @default(0)
+  lineTotal   Decimal
   sale        Sale     @relation(fields: [saleId], references: [id])
   product     Product  @relation(fields: [productId], references: [id])
 
@@ -365,8 +303,8 @@ model SaleItem {
 model SalePayment {
   id        String        @id @default(cuid())
   saleId    String
-  method    PaymentMethod
-  amount    Decimal       @db.Decimal(14, 2)
+  method    String
+  amount    Decimal
   reference String?
   createdAt DateTime      @default(now())
   sale      Sale          @relation(fields: [saleId], references: [id])
@@ -377,7 +315,7 @@ model SalePayment {
 model PurchaseOrder {
   id         String              @id @default(cuid())
   supplierId String
-  status     PurchaseOrderStatus @default(DRAFT)
+  status     String              @default("DRAFT")
   orderDate  DateTime            @default(now())
   expectedAt DateTime?
   createdAt  DateTime            @default(now())
@@ -393,9 +331,9 @@ model PurchaseOrderItem {
   id              String        @id @default(cuid())
   purchaseOrderId String
   productId       String
-  orderedQuantity Decimal       @db.Decimal(18, 6)
-  receivedQuantity Decimal      @default(0) @db.Decimal(18, 6)
-  unitCost        Decimal       @db.Decimal(14, 2)
+  orderedQuantity Decimal
+  receivedQuantity Decimal      @default(0)
+  unitCost        Decimal
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
@@ -419,3 +357,4 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action, createdAt])
 }
+

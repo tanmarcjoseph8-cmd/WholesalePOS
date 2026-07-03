@@ -1,13 +1,12 @@
 # Deployment Guide
 
-WholesalePOS is structured for container deployment.
+WholesalePOS is currently structured for single-device local deployment. The normal setup does not require Docker, PostgreSQL, or a server running elsewhere.
 
 ## Deployment Checklist
 
 - Set production-grade `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`.
-- Use a managed PostgreSQL database or persistent Docker volume.
-- Run Prisma migrations before serving traffic.
-- Terminate TLS at the load balancer or reverse proxy.
-- Restrict CORS to trusted frontend origins.
+- Run Prisma migrations before first use so `database/wholesalepos.sqlite` is created.
+- Keep the installed app folder on a reliable local drive.
+- Back up `database/wholesalepos.sqlite` on a fixed retention schedule.
+- Restrict CORS to the local frontend origin for the desktop build.
 - Enable log collection for backend stdout.
-- Back up PostgreSQL on a fixed retention schedule.

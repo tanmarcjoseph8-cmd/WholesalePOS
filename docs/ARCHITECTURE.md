@@ -6,6 +6,8 @@ WholesalePOS is now scoped as a single-device POS and inventory system. The appl
 
 The system does not need to coordinate live state across multiple cashiers, tablets, phones, or remote terminals. This keeps the product simpler to operate and reduces networking requirements for small shops.
 
+Data persists locally in `database/wholesalepos.sqlite`. That file is the durable day-to-day memory for products, stock, sales, users, and audit history.
+
 ## Local Updates
 
 The app must still update immediately on the active device after important actions:

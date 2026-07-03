@@ -6,7 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
-  DATABASE_URL: z.string().url().default("postgresql://wholesalepos:wholesalepos@localhost:5432/wholesalepos?schema=public"),
+  DATABASE_URL: z.string().min(1).default("file:../../database/wholesalepos.sqlite"),
   JWT_ACCESS_SECRET: z.string().min(32).default("development-access-secret-change-before-production"),
   JWT_REFRESH_SECRET: z.string().min(32).default("development-refresh-secret-change-before-production"),
   ACCESS_TOKEN_TTL: z.string().default("15m"),

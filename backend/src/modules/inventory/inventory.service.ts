@@ -58,9 +58,9 @@ export async function listStock(query: InventoryListQuery) {
       ? {
           product: {
             OR: [
-              { name: { contains: query.search, mode: "insensitive" } },
-              { sku: { contains: query.search, mode: "insensitive" } },
-              { barcodes: { some: { value: { contains: query.search, mode: "insensitive" } } } }
+              { name: { contains: query.search } },
+              { sku: { contains: query.search } },
+              { barcodes: { some: { value: { contains: query.search } } } }
             ]
           }
         }

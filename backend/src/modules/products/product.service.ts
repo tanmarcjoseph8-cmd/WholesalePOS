@@ -75,10 +75,10 @@ export async function listProducts(query: ProductListQuery) {
     ...(query.search
       ? {
           OR: [
-            { name: { contains: query.search, mode: "insensitive" } },
-            { sku: { contains: query.search, mode: "insensitive" } },
-            { brand: { contains: query.search, mode: "insensitive" } },
-            { barcodes: { some: { value: { contains: query.search, mode: "insensitive" } } } }
+            { name: { contains: query.search } },
+            { sku: { contains: query.search } },
+            { brand: { contains: query.search } },
+            { barcodes: { some: { value: { contains: query.search } } } }
           ]
         }
       : {})
