@@ -24,7 +24,8 @@ export function convertToBaseQuantity(quantity: number, unit: UnitCode) {
     throw new Error("Quantity must be greater than zero.");
   }
 
-  return parsedQuantity.data * conversionToBase[unit];
+  const parsedUnit = unitSchema.parse(unit);
+  return parsedQuantity.data * conversionToBase[parsedUnit];
 }
 
 export function calculateVariableUnitPrice(baseUnitPrice: number, soldQuantity: number, soldUnit: UnitCode) {

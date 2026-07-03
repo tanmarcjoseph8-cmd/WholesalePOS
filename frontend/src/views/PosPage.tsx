@@ -1,3 +1,5 @@
+import { formatCurrency } from "../lib/currency";
+
 export function PosPage() {
   return (
     <section className="grid min-h-[calc(100vh-8rem)] gap-4 xl:grid-cols-[1fr_420px]">
@@ -26,9 +28,9 @@ export function PosPage() {
           No items added.
         </div>
         <div className="mt-5 space-y-2 text-sm">
-          <div className="flex justify-between"><span>Subtotal</span><strong>PHP 0.00</strong></div>
-          <div className="flex justify-between"><span>Tax</span><strong>PHP 0.00</strong></div>
-          <div className="flex justify-between text-lg"><span>Total</span><strong>PHP 0.00</strong></div>
+          <div className="flex justify-between"><span>Subtotal</span><strong>{formatCurrency(0)}</strong></div>
+          <div className="flex justify-between"><span>Tax</span><strong>{formatCurrency(0)}</strong></div>
+          <div className="flex justify-between text-lg"><span>Total</span><strong>{formatCurrency(0)}</strong></div>
         </div>
         <button className="focus-ring mt-5 w-full rounded-md bg-mint px-4 py-3 text-sm font-bold text-white">Checkout</button>
       </aside>

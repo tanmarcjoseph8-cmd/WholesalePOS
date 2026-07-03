@@ -2,3 +2,8 @@ packages:
   - frontend
   - backend
   - tests
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true

@@ -1,6 +1,8 @@
+import { formatCurrency } from "../lib/currency";
+
 const metrics = [
-  { label: "Today's Sales", value: "PHP 0.00", tone: "bg-ocean" },
-  { label: "Inventory Value", value: "PHP 0.00", tone: "bg-mint" },
+  { label: "Today's Sales", value: formatCurrency(0), tone: "bg-ocean" },
+  { label: "Inventory Value", value: formatCurrency(0), tone: "bg-mint" },
   { label: "Low Stock", value: "0", tone: "bg-amber" },
   { label: "Live Orders", value: "0", tone: "bg-rose" }
 ];

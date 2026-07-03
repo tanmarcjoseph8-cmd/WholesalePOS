@@ -40,7 +40,15 @@ Milestone 1 establishes the runnable project foundation:
    pnpm db:migrate
    ```
 
-5. Start the application:
+5. Bootstrap the owner account:
+
+   ```powershell
+   $env:ADMIN_EMAIL="owner@example.com"
+   $env:ADMIN_PASSWORD="change-this-password"
+   pnpm --filter @wholesalepos/backend seed:admin
+   ```
+
+6. Start the application:
 
    ```bash
    pnpm dev

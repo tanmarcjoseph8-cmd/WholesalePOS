@@ -2,6 +2,7 @@
   "name": "wholesalepos-enterprise",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Enterprise wholesale and retail POS platform.",
   "packageManager": "pnpm@11.7.0",
   "scripts": {

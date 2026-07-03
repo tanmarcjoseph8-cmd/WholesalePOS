@@ -39,3 +39,31 @@ Response:
 ```
 
 Login attempts are rate limited and audited.
+
+`POST /auth/refresh`
+
+Rotates a valid refresh token and returns a new access token and refresh token. The previous refresh token is revoked permanently.
+
+Request:
+
+```json
+{
+  "refreshToken": "jwt"
+}
+```
+
+`POST /auth/logout`
+
+Revokes a refresh token and records an audit event.
+
+Request:
+
+```json
+{
+  "refreshToken": "jwt"
+}
+```
+
+`GET /auth/me`
+
+Requires an `Authorization: Bearer <accessToken>` header and returns the current user profile with permission keys.

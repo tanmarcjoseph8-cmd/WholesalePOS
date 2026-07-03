@@ -12,7 +12,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev --name init"
+    "db:migrate": "prisma migrate dev --name init",
+    "seed:admin": "tsx src/scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",
