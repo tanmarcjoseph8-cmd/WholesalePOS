@@ -4,13 +4,9 @@ import { publishRealtimeEvent } from "../../realtime/bus.js";
 import { realtimeEvents } from "../../realtime/events.js";
 import { AppError } from "../../shared/app-error.js";
 import { buildPaginatedResponse, getPagination } from "../../shared/pagination.js";
+import type { Actor } from "../auth/actor.js";
 import type { ProductCreateInput, ProductListQuery, ProductUpdateInput } from "./product.schemas.js";
 import { findPriceChanges, type PriceFields } from "./product-pricing.js";
-
-type Actor = {
-  userId: string;
-  storeId: string | null;
-};
 
 const productInclude = {
   barcodes: true,

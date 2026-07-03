@@ -38,7 +38,7 @@ export function DashboardPage() {
           <h3 className="text-lg font-bold">Priority Alerts</h3>
           <div className="mt-5 space-y-3 text-sm text-slate-600 dark:text-slate-300">
             <p className="rounded-md bg-slate-100 p-3 dark:bg-slate-800">No low-stock alerts.</p>
-            <p className="rounded-md bg-slate-100 p-3 dark:bg-slate-800">No failed synchronizations.</p>
+            <p className="rounded-md bg-slate-100 p-3 dark:bg-slate-800">No pending local updates.</p>
             <p className="rounded-md bg-slate-100 p-3 dark:bg-slate-800">No pending purchase receipts.</p>
           </div>
         </section>

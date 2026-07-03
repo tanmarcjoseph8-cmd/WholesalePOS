@@ -78,7 +78,7 @@ Supports pagination and filtering with `page`, `pageSize`, `search`, `status`, `
 
 `POST /products`
 
-Creates a product with SKU, prices, units, optional supplier/category links, and optional barcodes. The API validates input, writes an audit log, and broadcasts `product:created`.
+Creates a product with SKU, prices, units, optional supplier/category links, and optional barcodes. The API validates input, writes an audit log, and publishes a local `product:created` update event.
 
 `GET /products/:id`
 
@@ -86,8 +86,32 @@ Returns product details, barcodes, category, supplier, warehouse stock balances,
 
 `PATCH /products/:id`
 
-Updates product details. Price changes are stored in `PriceHistory` and broadcast as `price:changed`; other updates broadcast `product:updated`.
+Updates product details. Price changes are stored in `PriceHistory` and published as `price:changed`; other updates publish `product:updated`.
 
 `DELETE /products/:id`
 
 Soft-deletes the product by setting `deletedAt` and marking it inactive. Products are never physically deleted.
+
+## Inventory
+
+All inventory endpoints require `Authorization: Bearer <accessToken>`.
+
+`GET /inventory/stock`
+
+Returns paginated stock balances by product and warehouse. Supports `page`, `pageSize`, `productId`, `warehouseId`, `search`, and `lowStockOnly`.
+
+`GET /inventory/movements`
+
+Returns permanent movement history. Supports `page`, `pageSize`, `productId`, `warehouseId`, and `type`.
+
+`POST /inventory/movements`
+
+Creates a transactional stock movement. Supported movement types are `STOCK_IN`, `STOCK_OUT`, `ADJUSTMENT`, `DAMAGE`, `RETURN`, and `PURCHASE_RECEIPT`. Stock-out style movements cannot make inventory negative.
+
+`POST /inventory/counts`
+
+Sets stock to a counted quantity and stores the signed adjustment delta permanently.
+
+`POST /inventory/transfers`
+
+Transfers stock between warehouses in one database transaction. The API writes paired transfer movement rows and publishes local inventory update events.

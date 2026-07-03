@@ -16,3 +16,5 @@ Operational entities include `deletedAt` and are filtered at the service layer.
 ## Inventory Safety
 
 Stock-changing service methods must run inside database transactions and write both the balance update and the permanent movement row together.
+
+Current inventory endpoints follow this rule by updating `InventoryStock`, inserting `InventoryMovement`, and recording `AuditLog` in one transaction for stock movements, cycle counts, and transfers.

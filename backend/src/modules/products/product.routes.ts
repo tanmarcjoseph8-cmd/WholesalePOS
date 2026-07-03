@@ -1,20 +1,11 @@
 import { Router } from "express";
-import { getRequestAuth, requireAuth } from "../auth/auth.middleware.js";
+import { getActor } from "../auth/actor.js";
+import { requireAuth } from "../auth/auth.middleware.js";
 import { asyncHandler } from "../../shared/async-handler.js";
-import { AppError } from "../../shared/app-error.js";
 import { createProduct, deleteProduct, getProduct, listProducts, updateProduct } from "./product.service.js";
 import { productCreateSchema, productIdParamSchema, productListQuerySchema, productUpdateSchema } from "./product.schemas.js";
 
 export const productRouter = Router();
-
-function getActor(request: Parameters<typeof getRequestAuth>[0]) {
-  const auth = getRequestAuth(request);
-  if (!auth) {
-    throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication is required.");
-  }
-
-  return { userId: auth.userId, storeId: auth.storeId };
-}
 
 productRouter.use(requireAuth);
 
