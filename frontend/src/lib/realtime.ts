@@ -5,15 +5,16 @@ import { getApiBaseUrl } from "./api";
 const stockRefreshEvents = ["sale:created", "inventory:adjusted", "inventory:received", "product:created", "product:updated", "price:changed"];
 
 export async function refreshStockAwareViews(queryClient: QueryClient) {
+  const refetchType = "all" as const;
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["products"] }),
-    queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
-    queryClient.invalidateQueries({ queryKey: ["stock"] }),
-    queryClient.invalidateQueries({ queryKey: ["warehouses"] }),
-    queryClient.invalidateQueries({ queryKey: ["inventory-movements"] }),
-    queryClient.invalidateQueries({ queryKey: ["reports"] }),
-    queryClient.invalidateQueries({ queryKey: ["notifications"] }),
-    queryClient.invalidateQueries({ queryKey: ["api-health"] })
+    queryClient.invalidateQueries({ queryKey: ["products"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["pos-products"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["stock"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["warehouses"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["inventory-movements"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["reports"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["notifications"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["api-health"], refetchType })
   ]);
 }
 

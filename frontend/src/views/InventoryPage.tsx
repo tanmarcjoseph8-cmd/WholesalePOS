@@ -16,6 +16,7 @@ import {
   updateProduct
 } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
+import { refreshStockAwareViews } from "../lib/realtime";
 
 const emptyProduct: ProductCreatePayload = {
   sku: "",
@@ -117,7 +118,7 @@ export function InventoryPage() {
       setStockProductOverrides((current) => [createdProduct, ...current.filter((item) => item.id !== createdProduct.id)]);
       setStockForm((current) => ({ ...current, productId: createdProduct.id }));
       setStockMessage(`${createdProduct.name} is selected for stock entry.`);
-      await queryClient.invalidateQueries({ queryKey: ["products"] });
+      await refreshStockAwareViews(queryClient);
     }
   });
   const updateMutation = useMutation({
@@ -127,11 +128,7 @@ export function InventoryPage() {
       setEditingProduct(emptyProduct);
       setStockProductOverrides((current) => [updatedProduct, ...current.filter((item) => item.id !== updatedProduct.id)]);
       setStockMessage(`${updatedProduct.name} was updated.`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["products"] }),
-        queryClient.invalidateQueries({ queryKey: ["stock"] }),
-        queryClient.invalidateQueries({ queryKey: ["reports"] })
-      ]);
+      await refreshStockAwareViews(queryClient);
     }
   });
   const deleteMutation = useMutation({
@@ -141,12 +138,7 @@ export function InventoryPage() {
       setEditingProduct(emptyProduct);
       setStockForm((current) => ({ ...current, productId: "" }));
       setStockMessage("Product was removed from active inventory.");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["products"] }),
-        queryClient.invalidateQueries({ queryKey: ["stock"] }),
-        queryClient.invalidateQueries({ queryKey: ["inventory-movements"] }),
-        queryClient.invalidateQueries({ queryKey: ["reports"] })
-      ]);
+      await refreshStockAwareViews(queryClient);
     }
   });
   const stockMutation = useMutation({
@@ -173,11 +165,7 @@ export function InventoryPage() {
     onSuccess: async () => {
       setStockMessage("Inventory saved. Stock balances and history were updated.");
       setStockForm((current) => ({ ...current, quantity: 0, unitCost: 0, reason: "Manual stock update" }));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["products"] }),
-        queryClient.invalidateQueries({ queryKey: ["stock"] }),
-        queryClient.invalidateQueries({ queryKey: ["inventory-movements"] })
-      ]);
+      await refreshStockAwareViews(queryClient);
     }
   });
 

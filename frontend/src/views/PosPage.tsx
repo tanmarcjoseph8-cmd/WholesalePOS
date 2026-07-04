@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSale, fetchProducts, fetchSaleReceipt, fetchStock, fetchWarehouses, requestReceiptPrint, type Product } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
+import { refreshStockAwareViews } from "../lib/realtime";
 
 type CartItem = {
   product: Product;
@@ -110,10 +111,7 @@ export function PosPage() {
       setGcashAmount(0);
       setGcashReference("");
       setReceiptSaleId(sale.id);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["stock"] }),
-        queryClient.invalidateQueries({ queryKey: ["inventory-movements"] })
-      ]);
+      await refreshStockAwareViews(queryClient);
     }
   });
 
