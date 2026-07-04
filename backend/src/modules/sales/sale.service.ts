@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import { publishRealtimeEvent } from "../../realtime/bus.js";
+import { realtimeEvents } from "../../realtime/events.js";
 import { AppError } from "../../shared/app-error.js";
 import { buildPaginatedResponse, getPagination } from "../../shared/pagination.js";
 import type { Actor } from "../auth/actor.js";
@@ -49,7 +51,7 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
   }
   const storeId = actor.storeId;
 
-  return prisma.$transaction(async (transaction) => {
+  const sale = await prisma.$transaction(async (transaction) => {
     const receiptNumber = await nextReceiptNumber(transaction, storeId);
     const preparedItems = [];
 
@@ -189,4 +191,20 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
 
     return sale;
   });
+
+  const occurredAt = new Date().toISOString();
+  publishRealtimeEvent(realtimeEvents.saleCreated, {
+    entityId: sale.id,
+    actorId: actor.userId,
+    storeId,
+    occurredAt
+  });
+  publishRealtimeEvent(realtimeEvents.inventoryAdjusted, {
+    entityId: sale.id,
+    actorId: actor.userId,
+    storeId,
+    occurredAt
+  });
+
+  return sale;
 }

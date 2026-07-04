@@ -9,6 +9,7 @@ import { ReportsPage } from "../views/ReportsPage";
 import { SettingsPage } from "../views/SettingsPage";
 import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
+import { connectRealtimeUpdates } from "../lib/realtime";
 import {
   clearSession,
   fetchCurrentUser,
@@ -172,6 +173,7 @@ function InventoryPasswordGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 export function App() {
+  const queryClient = useQueryClient();
   const [darkMode, setDarkMode] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
   const [inventoryUnlocked, setInventoryUnlocked] = useState(false);
@@ -198,6 +200,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (!session) return undefined;
+    return connectRealtimeUpdates(queryClient);
+  }, [queryClient, session]);
 
   if (!session) {
     return <AuthScreen onSession={setSession} />;

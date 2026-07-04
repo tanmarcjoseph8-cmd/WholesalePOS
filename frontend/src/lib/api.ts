@@ -11,6 +11,10 @@ export type ApiHealth = z.infer<typeof healthSchema>;
 const apiUrl = import.meta.env.VITE_API_URL ?? "";
 const sessionKey = "wholesalepos.session";
 
+export function getApiBaseUrl() {
+  return apiUrl || window.location.origin;
+}
+
 const userSchema = z.object({
   id: z.string(),
   name: z.string(),
