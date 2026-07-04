@@ -239,7 +239,7 @@ try {
     }
   });
 
-  await requestJson(port, "/api/sales", {
+  const sale = await requestJson(port, "/api/sales", {
     method: "POST",
     token: session.accessToken,
     body: {
@@ -253,6 +253,24 @@ try {
   const remaining = stock?.items?.[0]?.quantity;
   if (Math.abs(Number(remaining) - 2.5) > 0.0001) {
     throw new Error(`Variable quantity stock deduction failed. Expected 2.5kg left, got ${remaining}.`);
+  }
+
+  const receipt = await requestJson(port, `/api/receipts/sales/${sale.id}?paperWidth=80mm`, { token: session.accessToken });
+  if (!receipt?.html?.includes(sale.receiptNumber) || !receipt?.barcodeSvg?.includes(sale.receiptNumber) || !receipt?.escPosBase64) {
+    throw new Error("Receipt generation smoke test failed.");
+  }
+
+  const printRequest = await requestJson(port, `/api/receipts/sales/${sale.id}/print`, {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      paperWidth: "80mm",
+      printerType: "WINDOWS",
+      printerName: "Smoke default printer"
+    }
+  });
+  if (!printRequest?.printLogId) {
+    throw new Error("Receipt print logging smoke test failed.");
   }
 
   console.info("Packaged desktop smoke test passed.");

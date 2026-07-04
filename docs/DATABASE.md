@@ -53,3 +53,9 @@ Current inventory endpoints follow this rule by updating `InventoryStock`, inser
 Products can define a package size and stock unit. Sales can be entered in compatible smaller units, such as grams for kilogram products, milliliters for liter products, and centimeters for meter products.
 
 Example: a 5kg rice sack priced at ₱300 has a package size of `5` and inventory unit `KILOGRAM`. Selling `2500` `GRAM` stores the cashier-entered quantity, converts the stock deduction to `2.5` `KILOGRAM`, and records the permanent sale item plus inventory movement in the same transaction.
+
+## Receipts and Printing
+
+Receipt numbers are generated from `ReceiptSequence` and saved on `Sale.receiptNumber`. The receipt module builds receipt text, HTML, barcode data, and ESC/POS command payloads directly from saved sale records so receipts can be regenerated later.
+
+Every print request inserts `ReceiptPrintLog` with the sale, user, printer type, printer name, paper width, status, and timestamp. This keeps a permanent record of receipt printing and reprinting without deleting historical sales.

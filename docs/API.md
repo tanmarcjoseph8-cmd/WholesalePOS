@@ -192,3 +192,40 @@ Request:
 ```
 
 For variable quantity selling, `quantity` is the amount entered by the cashier in `soldUnit`. The backend converts it to the product inventory unit, saves both the entered quantity and base stock quantity, calculates the package-based price, and deducts the converted stock amount. For example, a 5kg product priced at ₱300 can be sold as `2500` `GRAM`; the sale line totals ₱150 and deducts 2.5kg.
+
+## Receipts
+
+All receipt endpoints require `Authorization: Bearer <accessToken>` and the `sales.manage` permission.
+
+`GET /receipts/sales/:saleId?paperWidth=80mm`
+
+Returns a print-ready receipt for a completed sale. Supported paper widths are `58mm` and `80mm`.
+
+Response includes:
+
+```json
+{
+  "saleId": "sale-id",
+  "receiptNumber": "POS-000001",
+  "paperWidth": "80mm",
+  "barcodeData": "POS-000001",
+  "barcodeSvg": "<svg>...</svg>",
+  "text": "plain thermal receipt text",
+  "html": "print-ready receipt html",
+  "escPosBase64": "base64-encoded ESC/POS command payload"
+}
+```
+
+`POST /receipts/sales/:saleId/print`
+
+Records a permanent receipt print request and returns the same print payload. `printerType` can be `WINDOWS` for the app print dialog or `ESC_POS` for thermal printer command output.
+
+Request:
+
+```json
+{
+  "paperWidth": "80mm",
+  "printerType": "WINDOWS",
+  "printerName": "Windows default printer"
+}
+```

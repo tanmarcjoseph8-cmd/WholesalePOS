@@ -1,7 +1,7 @@
-import { Minus, Plus, ScanBarcode, Trash2 } from "lucide-react";
+import { Minus, Plus, Printer, ScanBarcode, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createSale, fetchProducts, fetchStock, fetchWarehouses, type Product } from "../lib/api";
+import { createSale, fetchProducts, fetchSaleReceipt, fetchStock, fetchWarehouses, requestReceiptPrint, type Product } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 
 type CartItem = {
@@ -64,9 +64,16 @@ export function PosPage() {
   const [cashAmount, setCashAmount] = useState(0);
   const [gcashAmount, setGcashAmount] = useState(0);
   const [gcashReference, setGcashReference] = useState("");
+  const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const [receiptPaperWidth, setReceiptPaperWidth] = useState<"58mm" | "80mm">("80mm");
   const products = useQuery({ queryKey: ["pos-products", search], queryFn: () => fetchProducts(search) });
   const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
   const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
+  const receipt = useQuery({
+    queryKey: ["receipt", receiptSaleId, receiptPaperWidth],
+    queryFn: () => fetchSaleReceipt({ saleId: receiptSaleId as string, paperWidth: receiptPaperWidth }),
+    enabled: Boolean(receiptSaleId)
+  });
   const defaultWarehouseId = warehouses.data?.[0]?.id ?? "";
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + calculateLine(item).subtotal, 0), [cart]);
@@ -90,11 +97,12 @@ export function PosPage() {
           ...(gcashAmount > 0 ? [{ method: "GCASH" as const, amount: gcashAmount, reference: gcashReference || null }] : [])
         ]
       }),
-    onSuccess: async () => {
+    onSuccess: async (sale) => {
       setCart([]);
       setCashAmount(0);
       setGcashAmount(0);
       setGcashReference("");
+      setReceiptSaleId(sale.id);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({ queryKey: ["inventory-movements"] })
@@ -127,6 +135,23 @@ export function PosPage() {
         .map((item) => (item.product.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item))
         .filter((item) => item.quantity > 0)
     );
+  }
+
+  async function printReceipt() {
+    if (!receiptSaleId) return;
+    const printPayload = await requestReceiptPrint({
+      saleId: receiptSaleId,
+      paperWidth: receiptPaperWidth,
+      printerType: "WINDOWS",
+      printerName: "Windows default printer"
+    });
+    const printWindow = window.open("", "_blank", "width=420,height=720");
+    if (!printWindow) return;
+    printWindow.document.open();
+    printWindow.document.write(printPayload.html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   return (
@@ -276,6 +301,47 @@ export function PosPage() {
           {checkout.isPending ? "Completing..." : "Checkout"}
         </button>
       </aside>
+
+      {receiptSaleId ? (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/60 p-4">
+          <section className="max-h-[90vh] w-full max-w-xl overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold">Receipt</h3>
+                <p className="text-sm text-slate-500">{receipt.data?.receiptNumber ?? "Loading..."}</p>
+              </div>
+              <button className="focus-ring rounded-md p-2" onClick={() => setReceiptSaleId(null)} aria-label="Close receipt">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+              <select
+                className="focus-ring h-10 rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                value={receiptPaperWidth}
+                onChange={(event) => setReceiptPaperWidth(event.target.value as "58mm" | "80mm")}
+              >
+                <option value="80mm">80mm paper</option>
+                <option value="58mm">58mm paper</option>
+              </select>
+              <button className="focus-ring inline-flex h-10 items-center gap-2 rounded-md bg-ocean px-3 text-sm font-bold text-white" onClick={() => void printReceipt()} disabled={!receipt.data}>
+                <Printer size={17} />
+                Print
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-auto bg-slate-100 p-4 dark:bg-slate-950">
+              {receipt.data ? (
+                <div
+                  className="mx-auto bg-white p-4 text-ink shadow-sm"
+                  style={{ width: receiptPaperWidth === "58mm" ? "260px" : "360px" }}
+                  dangerouslySetInnerHTML={{ __html: receipt.data.html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? receipt.data.html }}
+                />
+              ) : (
+                <div className="grid h-48 place-items-center text-sm text-slate-500">Loading receipt...</div>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

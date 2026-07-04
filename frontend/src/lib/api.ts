@@ -106,6 +106,26 @@ const inventoryMovementSchema = z.object({
   createdBy: z.object({ id: z.string(), name: z.string(), email: z.string() }).nullable()
 });
 
+const saleSummarySchema = z.object({
+  id: z.string(),
+  receiptNumber: z.string(),
+  grandTotal: z.coerce.number(),
+  paidTotal: z.coerce.number(),
+  changeTotal: z.coerce.number()
+});
+
+const receiptSchema = z.object({
+  saleId: z.string(),
+  receiptNumber: z.string(),
+  paperWidth: z.enum(["58mm", "80mm"]),
+  barcodeData: z.string(),
+  barcodeSvg: z.string(),
+  text: z.string(),
+  html: z.string(),
+  escPosBase64: z.string(),
+  printLogId: z.string().optional()
+});
+
 const paginatedStockSchema = z.object({
   items: z.array(inventoryStockSchema),
   pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
@@ -123,6 +143,8 @@ export type Product = z.infer<typeof productSchema>;
 export type Warehouse = z.infer<typeof warehouseSchema>;
 export type InventoryStock = z.infer<typeof inventoryStockSchema>;
 export type InventoryMovement = z.infer<typeof inventoryMovementSchema>;
+export type SaleSummary = z.infer<typeof saleSummarySchema>;
+export type ReceiptPreview = z.infer<typeof receiptSchema>;
 
 export type ProductCreatePayload = {
   sku: string;
@@ -294,10 +316,35 @@ export async function createSale(input: {
   items: Array<{ productId: string; warehouseId: string; quantity: number; soldUnit?: string; unitPrice?: number; discount: number }>;
   payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
 }) {
-  return apiRequest("/api/sales", {
-    method: "POST",
-    body: JSON.stringify({ customerId: null, ...input })
-  });
+  return saleSummarySchema.passthrough().parse(
+    await apiRequest("/api/sales", {
+      method: "POST",
+      body: JSON.stringify({ customerId: null, ...input })
+    })
+  );
+}
+
+export async function fetchSaleReceipt(input: { saleId: string; paperWidth: "58mm" | "80mm" }) {
+  const query = new URLSearchParams({ paperWidth: input.paperWidth });
+  return receiptSchema.parse(await apiRequest(`/api/receipts/sales/${input.saleId}?${query.toString()}`));
+}
+
+export async function requestReceiptPrint(input: {
+  saleId: string;
+  paperWidth: "58mm" | "80mm";
+  printerType: "WINDOWS" | "ESC_POS";
+  printerName?: string | null;
+}) {
+  return receiptSchema.parse(
+    await apiRequest(`/api/receipts/sales/${input.saleId}/print`, {
+      method: "POST",
+      body: JSON.stringify({
+        paperWidth: input.paperWidth,
+        printerType: input.printerType,
+        printerName: input.printerName ?? null
+      })
+    })
+  );
 }
 
 export async function createProduct(input: ProductCreatePayload) {
