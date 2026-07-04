@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import type { FocusEvent } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,12 +6,14 @@ import {
   adjustInventoryCount,
   createInventoryMovement,
   createProduct,
+  deleteProduct,
   fetchInventoryMovements,
   fetchProducts,
   fetchStock,
   fetchWarehouses,
   type Product,
-  type ProductCreatePayload
+  type ProductCreatePayload,
+  updateProduct
 } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 
@@ -49,11 +51,30 @@ function selectInputValue(event: FocusEvent<HTMLInputElement>) {
   event.currentTarget.select();
 }
 
+function productToForm(product: Product): ProductCreatePayload {
+  return {
+    sku: product.sku,
+    name: product.name,
+    brand: product.brand ?? "",
+    barcode: product.barcodes.find((barcode) => barcode.isPrimary)?.value ?? product.barcodes[0]?.value ?? "",
+    inventoryUnit: product.inventoryUnit,
+    sellingUnit: product.sellingUnit,
+    costPrice: product.costPrice,
+    retailPrice: product.retailPrice,
+    wholesalePrice: product.wholesalePrice,
+    packageSize: product.packageSize,
+    wholesaleThreshold: product.wholesaleThreshold,
+    minimumStock: product.minimumStock
+  };
+}
+
 export function InventoryPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [product, setProduct] = useState<ProductCreatePayload>(emptyProduct);
+  const [editingProductId, setEditingProductId] = useState("");
+  const [editingProduct, setEditingProduct] = useState<ProductCreatePayload>(emptyProduct);
   const [stockProductOverrides, setStockProductOverrides] = useState<Product[]>([]);
   const [stockForm, setStockForm] = useState({
     productId: "",
@@ -99,6 +120,35 @@ export function InventoryPage() {
       await queryClient.invalidateQueries({ queryKey: ["products"] });
     }
   });
+  const updateMutation = useMutation({
+    mutationFn: updateProduct,
+    onSuccess: async (updatedProduct) => {
+      setEditingProductId("");
+      setEditingProduct(emptyProduct);
+      setStockProductOverrides((current) => [updatedProduct, ...current.filter((item) => item.id !== updatedProduct.id)]);
+      setStockMessage(`${updatedProduct.name} was updated.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] })
+      ]);
+    }
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onSuccess: async () => {
+      setEditingProductId("");
+      setEditingProduct(emptyProduct);
+      setStockForm((current) => ({ ...current, productId: "" }));
+      setStockMessage("Product was removed from active inventory.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory-movements"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] })
+      ]);
+    }
+  });
   const stockMutation = useMutation({
     mutationFn: async () => {
       setStockMessage("");
@@ -133,6 +183,19 @@ export function InventoryPage() {
 
   const productCount = useMemo(() => products.data?.pagination.total ?? 0, [products.data?.pagination.total]);
   const canSaveStock = Boolean(stockForm.productId && selectedWarehouseId && stockForm.quantity > 0 && stockForm.reason.trim().length >= 3);
+
+  function beginEditing(item: Product) {
+    setIsAdding(false);
+    setEditingProductId(item.id);
+    setEditingProduct(productToForm(item));
+  }
+
+  function confirmDelete(item: Product) {
+    const confirmed = window.confirm(`Remove ${item.name} from active products? Sales and stock history will stay saved.`);
+    if (confirmed) {
+      deleteMutation.mutate(item.id);
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -319,6 +382,189 @@ export function InventoryPage() {
         </form>
       ) : null}
 
+      {editingProductId ? (
+        <form
+          className="grid gap-4 rounded-md border border-ocean/30 bg-white p-5 shadow-sm dark:border-ocean/40 dark:bg-slate-900 md:grid-cols-2 xl:grid-cols-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            updateMutation.mutate({ id: editingProductId, ...editingProduct });
+          }}
+        >
+          <div className="flex items-center justify-between md:col-span-2 xl:col-span-4">
+            <h3 className="text-lg font-bold">Quick Edit Product</h3>
+            <button
+              type="button"
+              className="focus-ring grid h-9 w-9 place-items-center rounded-md border border-slate-200 dark:border-slate-700"
+              aria-label="Close edit product"
+              onClick={() => {
+                setEditingProductId("");
+                setEditingProduct(emptyProduct);
+              }}
+            >
+              <X size={17} />
+            </button>
+          </div>
+          <label className="text-sm font-semibold">
+            Product name
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.name}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, name: event.target.value }))}
+              required
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            SKU
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.sku ?? ""}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, sku: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Barcode
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.barcode ?? ""}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, barcode: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Brand
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.brand ?? ""}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, brand: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Stock unit
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.inventoryUnit}
+              onChange={(event) =>
+                setEditingProduct((current) => ({
+                  ...current,
+                  inventoryUnit: event.target.value,
+                  sellingUnit: current.sellingUnit === current.inventoryUnit ? event.target.value : current.sellingUnit
+                }))
+              }
+            >
+              {unitOptions.map((unit) => (
+                <option key={unit.value} value={unit.value}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
+            Selling unit
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.sellingUnit}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, sellingUnit: event.target.value }))}
+            >
+              {unitOptions.map((unit) => (
+                <option key={unit.value} value={unit.value}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
+            Cost price
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="0.01"
+              value={editingProduct.costPrice}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, costPrice: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Retail price
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="0.01"
+              value={editingProduct.retailPrice}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, retailPrice: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Wholesale price
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="0.01"
+              value={editingProduct.wholesalePrice}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, wholesalePrice: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Package size
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={editingProduct.packageSize}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, packageSize: Number(event.target.value) }))}
+              required
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Wholesale threshold
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="0.001"
+              value={editingProduct.wholesaleThreshold}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, wholesaleThreshold: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Low stock alert
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="1"
+              value={editingProduct.minimumStock}
+              onFocus={selectInputValue}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, minimumStock: Number(event.target.value) }))}
+            />
+          </label>
+          {updateMutation.error ? <p className="rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose md:col-span-2 xl:col-span-4">{updateMutation.error.message}</p> : null}
+          <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-4">
+            <button className="focus-ring rounded-md bg-ocean px-4 py-2 text-sm font-bold text-white" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              type="button"
+              className="focus-ring inline-flex items-center gap-2 rounded-md border border-rose/30 px-4 py-2 text-sm font-bold text-rose"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                const item = products.data?.items.find((current) => current.id === editingProductId);
+                if (item) confirmDelete(item);
+              }}
+            >
+              <Trash2 size={16} />
+              Remove Product
+            </button>
+          </div>
+        </form>
+      ) : null}
+
       <form
         className="grid gap-4 rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2 xl:grid-cols-6"
         onSubmit={(event) => {
@@ -431,12 +677,13 @@ export function InventoryPage() {
               <th className="px-4 py-3">Retail</th>
               <th className="px-4 py-3">Wholesale</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {products.isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={7}>
+                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={8}>
                   Loading products...
                 </td>
               </tr>
@@ -455,11 +702,32 @@ export function InventoryPage() {
                   <td className="px-4 py-3">{formatCurrency(item.retailPrice)}</td>
                   <td className="px-4 py-3">{formatCurrency(item.wholesalePrice)}</td>
                   <td className="px-4 py-3">{item.status}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="focus-ring grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-ocean dark:border-slate-700"
+                        aria-label={`Edit ${item.name}`}
+                        onClick={() => beginEditing(item)}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="focus-ring grid h-9 w-9 place-items-center rounded-md border border-rose/30 text-rose"
+                        aria-label={`Remove ${item.name}`}
+                        disabled={deleteMutation.isPending}
+                        onClick={() => confirmDelete(item)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={7}>
+                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={8}>
                   No products yet. Add your first product to start using inventory.
                 </td>
               </tr>

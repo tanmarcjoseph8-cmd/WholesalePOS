@@ -229,6 +229,10 @@ export type ProductCreatePayload = {
   minimumStock: number;
 };
 
+export type ProductUpdatePayload = ProductCreatePayload & {
+  id: string;
+};
+
 function getStoredSession() {
   const rawSession = window.localStorage.getItem(sessionKey);
   if (!rawSession) return null;
@@ -500,6 +504,40 @@ export async function createProduct(input: ProductCreatePayload) {
         notes: null,
         barcodes
       })
+    })
+  );
+}
+
+export async function updateProduct(input: ProductUpdatePayload) {
+  const { id, ...product } = input;
+  const barcode = product.barcode?.trim();
+  return productSchema.parse(
+    await apiRequest(`/api/products/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        sku: product.sku?.trim() ? product.sku.trim() : undefined,
+        name: product.name,
+        brand: product.brand?.trim() ? product.brand.trim() : null,
+        inventoryUnit: product.inventoryUnit,
+        sellingUnit: product.sellingUnit,
+        unitRatioToBase: 1,
+        costPrice: product.costPrice,
+        retailPrice: product.retailPrice,
+        wholesalePrice: product.wholesalePrice,
+        vipPrice: product.wholesalePrice,
+        packageSize: product.packageSize,
+        wholesaleThreshold: product.wholesaleThreshold,
+        minimumStock: product.minimumStock,
+        barcodes: barcode ? [{ value: barcode, isPrimary: true }] : []
+      })
+    })
+  );
+}
+
+export async function deleteProduct(productId: string) {
+  return z.object({ success: z.boolean() }).parse(
+    await apiRequest(`/api/products/${productId}`, {
+      method: "DELETE"
     })
   );
 }
