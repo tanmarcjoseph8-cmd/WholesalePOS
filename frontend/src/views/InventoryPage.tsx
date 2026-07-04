@@ -70,7 +70,7 @@ export function InventoryPage() {
   });
   const stockProducts = useQuery({
     queryKey: ["products", "stock-selector"],
-    queryFn: () => fetchProducts("", 500)
+    queryFn: () => fetchProducts("", 1000)
   });
   const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
   const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });

@@ -338,7 +338,7 @@ export async function updateUser(input: { id: string; name?: string; status?: "A
   );
 }
 
-export async function fetchProducts(search: string, pageSize = 50) {
+export async function fetchProducts(search: string, pageSize = 1000) {
   const query = new URLSearchParams({ pageSize: String(pageSize) });
   if (search.trim()) query.set("search", search.trim());
   return productListSchema.parse(await apiRequest(`/api/products?${query.toString()}`));
@@ -349,13 +349,13 @@ export async function fetchWarehouses() {
 }
 
 export async function fetchStock(search: string, lowStockOnly = false) {
-  const query = new URLSearchParams({ pageSize: "100", lowStockOnly: String(lowStockOnly) });
+  const query = new URLSearchParams({ pageSize: "1000", lowStockOnly: String(lowStockOnly) });
   if (search.trim()) query.set("search", search.trim());
   return paginatedStockSchema.parse(await apiRequest(`/api/inventory/stock?${query.toString()}`));
 }
 
 export async function fetchInventoryMovements(productId?: string) {
-  const query = new URLSearchParams({ pageSize: "50" });
+  const query = new URLSearchParams({ pageSize: "1000" });
   if (productId) query.set("productId", productId);
   return paginatedMovementsSchema.parse(await apiRequest(`/api/inventory/movements?${query.toString()}`));
 }

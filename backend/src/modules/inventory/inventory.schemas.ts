@@ -34,7 +34,7 @@ export const inventoryTransferSchema = z.object({
 
 export const inventoryListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(25),
+  pageSize: z.coerce.number().int().positive().max(1000).default(25),
   productId: z.string().trim().min(1).optional(),
   warehouseId: z.string().trim().min(1).optional(),
   search: z.string().trim().max(120).optional(),
@@ -43,7 +43,7 @@ export const inventoryListQuerySchema = z.object({
 
 export const movementListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(25),
+  pageSize: z.coerce.number().int().positive().max(1000).default(25),
   productId: z.string().trim().min(1).optional(),
   warehouseId: z.string().trim().min(1).optional(),
   type: z.enum(["STOCK_IN", "STOCK_OUT", "ADJUSTMENT", "DAMAGE", "RETURN", "TRANSFER", "SALE", "PURCHASE_RECEIPT"]).optional()

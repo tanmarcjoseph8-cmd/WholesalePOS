@@ -23,7 +23,7 @@ const money = z.coerce.number().finite().min(0).max(999_999_999.99);
 const decimalQuantity = z.coerce.number().finite().min(0).max(999_999_999.999999);
 
 const barcodeSchema = z.object({
-  value: z.string().trim().min(3).max(64),
+  value: z.string().trim().min(1).max(64),
   isPrimary: z.boolean().default(false)
 });
 
@@ -64,7 +64,7 @@ export const productUpdateSchema = productCreateSchema
 
 export const productListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(25),
+  pageSize: z.coerce.number().int().positive().max(1000).default(25),
   search: z.string().trim().max(120).optional(),
   status: productStatusSchema.optional(),
   categoryId: z.string().trim().min(1).optional(),
