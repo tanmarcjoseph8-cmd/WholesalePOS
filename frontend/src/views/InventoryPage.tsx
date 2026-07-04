@@ -1,4 +1,5 @@
 import { Plus, Search } from "lucide-react";
+import type { FocusEvent } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,6 +43,10 @@ const unitOptions = [
   { value: "BOTTLE", label: "Bottle" },
   { value: "ROLL", label: "Roll" }
 ];
+
+function selectInputValue(event: FocusEvent<HTMLInputElement>) {
+  event.currentTarget.select();
+}
 
 export function InventoryPage() {
   const queryClient = useQueryClient();
@@ -149,16 +154,15 @@ export function InventoryPage() {
             />
           </label>
           <label className="text-sm font-semibold">
-            SKU
+            SKU (optional)
             <input
               className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
-              value={product.sku}
+              value={product.sku ?? ""}
               onChange={(event) => setProduct((current) => ({ ...current, sku: event.target.value }))}
-              required
             />
           </label>
           <label className="text-sm font-semibold">
-            Barcode
+            Barcode (optional)
             <input
               className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
               value={product.barcode ?? ""}
@@ -215,6 +219,7 @@ export function InventoryPage() {
               min="0"
               step="0.01"
               value={product.costPrice}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, costPrice: Number(event.target.value) }))}
             />
           </label>
@@ -226,6 +231,7 @@ export function InventoryPage() {
               min="0"
               step="0.01"
               value={product.retailPrice}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, retailPrice: Number(event.target.value) }))}
             />
           </label>
@@ -237,6 +243,7 @@ export function InventoryPage() {
               min="0"
               step="0.01"
               value={product.wholesalePrice}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, wholesalePrice: Number(event.target.value) }))}
             />
           </label>
@@ -248,6 +255,7 @@ export function InventoryPage() {
               min="0.001"
               step="0.001"
               value={product.packageSize}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, packageSize: Number(event.target.value) }))}
               required
             />
@@ -260,6 +268,7 @@ export function InventoryPage() {
               min="0"
               step="0.001"
               value={product.wholesaleThreshold}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, wholesaleThreshold: Number(event.target.value) }))}
             />
           </label>
@@ -271,6 +280,7 @@ export function InventoryPage() {
               min="0"
               step="1"
               value={product.minimumStock}
+              onFocus={selectInputValue}
               onChange={(event) => setProduct((current) => ({ ...current, minimumStock: Number(event.target.value) }))}
             />
           </label>
@@ -347,6 +357,7 @@ export function InventoryPage() {
             min="0"
             step="0.001"
             value={stockForm.quantity}
+            onFocus={selectInputValue}
             onChange={(event) => setStockForm((current) => ({ ...current, quantity: Number(event.target.value) }))}
             required
           />
@@ -359,6 +370,7 @@ export function InventoryPage() {
             min="0"
             step="0.01"
             value={stockForm.unitCost}
+            onFocus={selectInputValue}
             onChange={(event) => setStockForm((current) => ({ ...current, unitCost: Number(event.target.value) }))}
           />
         </label>

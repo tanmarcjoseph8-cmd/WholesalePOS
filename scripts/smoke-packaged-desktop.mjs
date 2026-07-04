@@ -187,7 +187,6 @@ try {
     method: "POST",
     token: session.accessToken,
     body: {
-      sku: "SMOKE-001",
       name: "Smoke Test Product",
       description: null,
       imageUrl: null,
@@ -216,8 +215,42 @@ try {
   });
 
   const list = await requestJson(port, "/api/products?pageSize=10", { token: session.accessToken });
-  if (product?.name !== "Smoke Test Product" || !Array.isArray(list?.items) || list.items.length !== 1) {
+  if (product?.name !== "Smoke Test Product" || product?.sku !== "123456789012" || !Array.isArray(list?.items) || list.items.length !== 1) {
     throw new Error("Packaged product persistence smoke test failed.");
+  }
+
+  const noBarcodeProduct = await requestJson(port, "/api/products", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      name: "No Barcode Product",
+      description: null,
+      imageUrl: null,
+      brand: "Smoke",
+      categoryId: null,
+      supplierId: null,
+      inventoryUnit: "PIECE",
+      sellingUnit: "PIECE",
+      unitRatioToBase: 1,
+      costPrice: 8,
+      retailPrice: 12,
+      wholesalePrice: 10,
+      vipPrice: 10,
+      packageSize: 1,
+      taxRate: 0,
+      wholesaleThreshold: 0,
+      minimumStock: 1,
+      maximumStock: null,
+      status: "ACTIVE",
+      expiresAt: null,
+      batchNumber: null,
+      location: null,
+      notes: null,
+      barcodes: []
+    }
+  });
+  if (noBarcodeProduct?.name !== "No Barcode Product" || !String(noBarcodeProduct?.sku).startsWith("AUTO-") || noBarcodeProduct?.barcodes?.length !== 0) {
+    throw new Error("No-barcode product smoke test failed.");
   }
 
   const warehouses = await requestJson(port, "/api/inventory/warehouses", { token: session.accessToken });

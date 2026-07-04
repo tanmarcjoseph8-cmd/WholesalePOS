@@ -207,7 +207,7 @@ export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type BackupRun = z.infer<typeof backupRunSchema>;
 
 export type ProductCreatePayload = {
-  sku: string;
+  sku?: string | null;
   name: string;
   brand?: string | null;
   barcode?: string | null;
@@ -457,7 +457,7 @@ export async function createProduct(input: ProductCreatePayload) {
     await apiRequest("/api/products", {
       method: "POST",
       body: JSON.stringify({
-        sku: input.sku,
+        sku: input.sku?.trim() ? input.sku.trim() : undefined,
         name: input.name,
         brand: input.brand?.trim() ? input.brand.trim() : null,
         description: null,

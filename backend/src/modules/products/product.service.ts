@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import crypto from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { publishRealtimeEvent } from "../../realtime/bus.js";
 import { realtimeEvents } from "../../realtime/events.js";
@@ -33,6 +34,19 @@ function normalizeBarcodes(barcodes: ProductCreateInput["barcodes"]) {
   }
 
   return uniqueBarcodes;
+}
+
+function resolveSku(input: ProductCreateInput, barcodes: ReturnType<typeof normalizeBarcodes>) {
+  if (input.sku?.trim()) {
+    return input.sku.trim();
+  }
+
+  const primaryBarcode = barcodes.find((barcode) => barcode.isPrimary) ?? barcodes[0];
+  if (primaryBarcode) {
+    return primaryBarcode.value;
+  }
+
+  return `AUTO-${crypto.randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
 function toPriceFields(product: {
@@ -123,11 +137,13 @@ export async function getProduct(productId: string) {
 export async function createProduct(input: ProductCreateInput, actor: Actor) {
   await assertRelations(input);
   const barcodes = normalizeBarcodes(input.barcodes);
+  const sku = resolveSku(input, barcodes);
 
   const product = await prisma.$transaction(async (transaction) => {
     const created = await transaction.product.create({
       data: {
         ...input,
+        sku,
         barcodes: {
           create: barcodes
         }

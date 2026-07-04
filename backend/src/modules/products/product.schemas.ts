@@ -28,7 +28,7 @@ const barcodeSchema = z.object({
 });
 
 export const productCreateSchema = z.object({
-  sku: z.string().trim().min(2).max(64),
+  sku: z.string().trim().min(2).max(64).optional(),
   name: z.string().trim().min(2).max(160),
   description: nullableText,
   imageUrl: z.string().trim().url().optional().nullable(),
