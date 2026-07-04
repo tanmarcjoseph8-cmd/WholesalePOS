@@ -1,4 +1,4 @@
-import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, Search, Settings, Sun, Users } from "lucide-react";
+import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, RefreshCw, Search, Settings, Sun, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ import { ReportsPage } from "../views/ReportsPage";
 import { SettingsPage } from "../views/SettingsPage";
 import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
-import { connectRealtimeUpdates } from "../lib/realtime";
+import { connectRealtimeUpdates, refreshStockAwareViews } from "../lib/realtime";
 import {
   clearSession,
   fetchCurrentUser,
@@ -197,6 +197,8 @@ export function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
   const [inventoryUnlocked, setInventoryUnlocked] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => loadNotificationIds(dismissedNotificationsKey));
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => loadNotificationIds(readNotificationsKey));
   const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser, enabled: Boolean(session) });
@@ -255,6 +257,18 @@ export function App() {
     setNotificationsOpen(false);
   }
 
+  async function syncAppData() {
+    setIsSyncing(true);
+    setSyncMessage("");
+    try {
+      await refreshStockAwareViews(queryClient);
+      setSyncMessage("Synced");
+    } finally {
+      setIsSyncing(false);
+      window.setTimeout(() => setSyncMessage(""), 2500);
+    }
+  }
+
   if (!session) {
     return <AuthScreen onSession={setSession} />;
   }
@@ -308,6 +322,18 @@ export function App() {
             <span className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700">
               {statusLabel}
             </span>
+            <div className="flex items-center gap-2">
+              <button
+                className="focus-ring inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold dark:border-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => void syncAppData()}
+                disabled={isSyncing}
+                aria-label="Sync app data"
+              >
+                <RefreshCw className={isSyncing ? "animate-spin" : ""} size={17} />
+                Sync
+              </button>
+              {syncMessage ? <span className="text-xs font-semibold text-mint">{syncMessage}</span> : null}
+            </div>
             <div className="relative">
               <button
                 className="focus-ring relative grid h-11 w-11 place-items-center rounded-md border border-slate-200 dark:border-slate-700"

@@ -4,13 +4,17 @@ import { getApiBaseUrl } from "./api";
 
 const stockRefreshEvents = ["sale:created", "inventory:adjusted", "inventory:received", "product:created", "product:updated", "price:changed"];
 
-function refreshStockAwareViews(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: ["products"] });
-  void queryClient.invalidateQueries({ queryKey: ["pos-products"] });
-  void queryClient.invalidateQueries({ queryKey: ["stock"] });
-  void queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
-  void queryClient.invalidateQueries({ queryKey: ["reports"] });
-  void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+export async function refreshStockAwareViews(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["products"] }),
+    queryClient.invalidateQueries({ queryKey: ["pos-products"] }),
+    queryClient.invalidateQueries({ queryKey: ["stock"] }),
+    queryClient.invalidateQueries({ queryKey: ["warehouses"] }),
+    queryClient.invalidateQueries({ queryKey: ["inventory-movements"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports"] }),
+    queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    queryClient.invalidateQueries({ queryKey: ["api-health"] })
+  ]);
 }
 
 export function connectRealtimeUpdates(queryClient: QueryClient) {
@@ -20,7 +24,9 @@ export function connectRealtimeUpdates(queryClient: QueryClient) {
   });
 
   for (const eventName of stockRefreshEvents) {
-    socket.on(eventName, () => refreshStockAwareViews(queryClient));
+    socket.on(eventName, () => {
+      void refreshStockAwareViews(queryClient);
+    });
   }
 
   return () => {
