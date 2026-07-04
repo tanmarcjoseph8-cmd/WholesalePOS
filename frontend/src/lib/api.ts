@@ -338,8 +338,8 @@ export async function updateUser(input: { id: string; name?: string; status?: "A
   );
 }
 
-export async function fetchProducts(search: string) {
-  const query = new URLSearchParams({ pageSize: "50" });
+export async function fetchProducts(search: string, pageSize = 50) {
+  const query = new URLSearchParams({ pageSize: String(pageSize) });
   if (search.trim()) query.set("search", search.trim());
   return productListSchema.parse(await apiRequest(`/api/products?${query.toString()}`));
 }

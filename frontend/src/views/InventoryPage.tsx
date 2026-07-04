@@ -10,6 +10,7 @@ import {
   fetchProducts,
   fetchStock,
   fetchWarehouses,
+  type Product,
   type ProductCreatePayload
 } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
@@ -53,6 +54,7 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [product, setProduct] = useState<ProductCreatePayload>(emptyProduct);
+  const [stockProductOverrides, setStockProductOverrides] = useState<Product[]>([]);
   const [stockForm, setStockForm] = useState({
     productId: "",
     warehouseId: "",
@@ -68,7 +70,7 @@ export function InventoryPage() {
   });
   const stockProducts = useQuery({
     queryKey: ["products", "stock-selector"],
-    queryFn: () => fetchProducts("")
+    queryFn: () => fetchProducts("", 500)
   });
   const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
   const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
@@ -76,12 +78,22 @@ export function InventoryPage() {
   const movements = useQuery({ queryKey: ["inventory-movements"], queryFn: () => fetchInventoryMovements() });
   const defaultWarehouseId = warehouses.data?.[0]?.id ?? "";
   const selectedWarehouseId = stockForm.warehouseId || defaultWarehouseId;
+  const stockSelectorProducts = useMemo(() => {
+    const productsById = new Map<string, Product>();
+
+    for (const item of stockProducts.data?.items ?? []) productsById.set(item.id, item);
+    for (const item of products.data?.items ?? []) productsById.set(item.id, item);
+    for (const item of stockProductOverrides) productsById.set(item.id, item);
+
+    return Array.from(productsById.values()).sort((first, second) => first.name.localeCompare(second.name));
+  }, [products.data?.items, stockProducts.data?.items, stockProductOverrides]);
 
   const createMutation = useMutation({
     mutationFn: createProduct,
     onSuccess: async (createdProduct) => {
       setProduct(emptyProduct);
       setIsAdding(false);
+      setStockProductOverrides((current) => [createdProduct, ...current.filter((item) => item.id !== createdProduct.id)]);
       setStockForm((current) => ({ ...current, productId: createdProduct.id }));
       setStockMessage(`${createdProduct.name} is selected for stock entry.`);
       await queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -323,9 +335,11 @@ export function InventoryPage() {
             required
           >
             <option value="">Select product</option>
-            {stockProducts.data?.items.map((item) => (
+            {stockProducts.isLoading && stockSelectorProducts.length === 0 ? <option disabled>Loading products...</option> : null}
+            {!stockProducts.isLoading && stockSelectorProducts.length === 0 ? <option disabled>No products found</option> : null}
+            {stockSelectorProducts.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} ({item.sku})
+                {item.sku ? `${item.name} (${item.sku})` : item.name}
               </option>
             ))}
           </select>
