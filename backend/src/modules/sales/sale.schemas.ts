@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+const unitTypeSchema = z.enum([
+  "KILOGRAM",
+  "GRAM",
+  "LITER",
+  "MILLILITER",
+  "METER",
+  "CENTIMETER",
+  "PIECE",
+  "PACK",
+  "CASE",
+  "BUNDLE",
+  "BOTTLE",
+  "ROLL",
+  "CUSTOM"
+]);
+
 export const saleCreateSchema = z.object({
   customerId: z.string().trim().min(1).optional().nullable(),
   items: z
@@ -8,6 +24,7 @@ export const saleCreateSchema = z.object({
         productId: z.string().trim().min(1),
         warehouseId: z.string().trim().min(1),
         quantity: z.coerce.number().finite().positive().max(999_999_999.999999),
+        soldUnit: unitTypeSchema.optional(),
         unitPrice: z.coerce.number().finite().min(0).max(999_999_999.99).optional(),
         discount: z.coerce.number().finite().min(0).max(999_999_999.99).default(0)
       })

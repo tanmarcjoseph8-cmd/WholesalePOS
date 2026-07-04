@@ -176,8 +176,8 @@ Request:
     {
       "productId": "product-id",
       "warehouseId": "warehouse-id",
-      "quantity": 2,
-      "unitPrice": 50,
+      "quantity": 2500,
+      "soldUnit": "GRAM",
       "discount": 0
     }
   ],
@@ -190,3 +190,5 @@ Request:
   ]
 }
 ```
+
+For variable quantity selling, `quantity` is the amount entered by the cashier in `soldUnit`. The backend converts it to the product inventory unit, saves both the entered quantity and base stock quantity, calculates the package-based price, and deducts the converted stock amount. For example, a 5kg product priced at ₱300 can be sold as `2500` `GRAM`; the sale line totals ₱150 and deducts 2.5kg.

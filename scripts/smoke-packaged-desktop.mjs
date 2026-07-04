@@ -194,14 +194,16 @@ try {
       brand: "Smoke",
       categoryId: null,
       supplierId: null,
-      inventoryUnit: "PIECE",
-      sellingUnit: "PIECE",
+      inventoryUnit: "KILOGRAM",
+      sellingUnit: "KILOGRAM",
       unitRatioToBase: 1,
-      costPrice: 10,
-      retailPrice: 15,
-      wholesalePrice: 12,
-      vipPrice: 12,
+      costPrice: 240,
+      retailPrice: 300,
+      wholesalePrice: 280,
+      vipPrice: 280,
+      packageSize: 5,
       taxRate: 0,
+      wholesaleThreshold: 0,
       minimumStock: 1,
       maximumStock: null,
       status: "ACTIVE",
@@ -216,6 +218,41 @@ try {
   const list = await requestJson(port, "/api/products?pageSize=10", { token: session.accessToken });
   if (product?.name !== "Smoke Test Product" || !Array.isArray(list?.items) || list.items.length !== 1) {
     throw new Error("Packaged product persistence smoke test failed.");
+  }
+
+  const warehouses = await requestJson(port, "/api/inventory/warehouses", { token: session.accessToken });
+  const warehouseId = warehouses?.[0]?.id;
+  if (!warehouseId) {
+    throw new Error("Packaged warehouse smoke test failed.");
+  }
+
+  await requestJson(port, "/api/inventory/movements", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      productId: product.id,
+      warehouseId,
+      type: "STOCK_IN",
+      quantity: 5,
+      unitCost: 240,
+      reason: "Packaged smoke stock"
+    }
+  });
+
+  await requestJson(port, "/api/sales", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      customerId: null,
+      items: [{ productId: product.id, warehouseId, quantity: 2500, soldUnit: "GRAM", discount: 0 }],
+      payments: [{ method: "CASH", amount: 150, reference: null }]
+    }
+  });
+
+  const stock = await requestJson(port, `/api/inventory/stock?productId=${product.id}`, { token: session.accessToken });
+  const remaining = stock?.items?.[0]?.quantity;
+  if (Math.abs(Number(remaining) - 2.5) > 0.0001) {
+    throw new Error(`Variable quantity stock deduction failed. Expected 2.5kg left, got ${remaining}.`);
   }
 
   console.info("Packaged desktop smoke test passed.");

@@ -50,9 +50,11 @@ const productSchema = z.object({
   brand: z.string().nullable(),
   inventoryUnit: z.string(),
   sellingUnit: z.string(),
+  packageSize: z.coerce.number(),
   retailPrice: z.coerce.number(),
   wholesalePrice: z.coerce.number(),
   costPrice: z.coerce.number(),
+  wholesaleThreshold: z.coerce.number(),
   minimumStock: z.coerce.number(),
   status: z.string(),
   barcodes: z.array(z.object({ id: z.string(), value: z.string(), isPrimary: z.boolean() })).default([])
@@ -127,9 +129,13 @@ export type ProductCreatePayload = {
   name: string;
   brand?: string | null;
   barcode?: string | null;
+  inventoryUnit: string;
+  sellingUnit: string;
   costPrice: number;
   retailPrice: number;
   wholesalePrice: number;
+  packageSize: number;
+  wholesaleThreshold: number;
   minimumStock: number;
 };
 
@@ -285,7 +291,7 @@ export async function adjustInventoryCount(input: { productId: string; warehouse
 }
 
 export async function createSale(input: {
-  items: Array<{ productId: string; warehouseId: string; quantity: number; unitPrice: number; discount: number }>;
+  items: Array<{ productId: string; warehouseId: string; quantity: number; soldUnit?: string; unitPrice?: number; discount: number }>;
   payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
 }) {
   return apiRequest("/api/sales", {
@@ -307,14 +313,16 @@ export async function createProduct(input: ProductCreatePayload) {
         imageUrl: null,
         categoryId: null,
         supplierId: null,
-        inventoryUnit: "PIECE",
-        sellingUnit: "PIECE",
+        inventoryUnit: input.inventoryUnit,
+        sellingUnit: input.sellingUnit,
         unitRatioToBase: 1,
         costPrice: input.costPrice,
         retailPrice: input.retailPrice,
         wholesalePrice: input.wholesalePrice,
         vipPrice: input.wholesalePrice,
+        packageSize: input.packageSize,
         taxRate: 0,
+        wholesaleThreshold: input.wholesaleThreshold,
         minimumStock: input.minimumStock,
         maximumStock: null,
         status: "ACTIVE",

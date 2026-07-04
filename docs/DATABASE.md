@@ -14,6 +14,7 @@ Back up `database/wholesalepos.sqlite` regularly before real business use. The f
 
 - `InventoryMovement` records every stock-changing event.
 - `Sale`, `SaleItem`, and `SalePayment` preserve recoverable sale history.
+- `SaleItem.soldQuantity`, `SaleItem.soldUnit`, and `SaleItem.baseQuantity` preserve variable quantity sales exactly as entered and as deducted from stock.
 - `AuditLog` records authentication and sensitive business actions.
 - `PriceHistory` records product price changes.
 - `ReceiptPrintLog` records print and reprint attempts.
@@ -46,3 +47,9 @@ Operational entities include `deletedAt` and are filtered at the service layer.
 Stock-changing service methods must run inside database transactions and write both the balance update and the permanent movement row together.
 
 Current inventory endpoints follow this rule by updating `InventoryStock`, inserting `InventoryMovement`, and recording `AuditLog` in one transaction for stock movements, cycle counts, and transfers.
+
+## Variable Quantity Selling
+
+Products can define a package size and stock unit. Sales can be entered in compatible smaller units, such as grams for kilogram products, milliliters for liter products, and centimeters for meter products.
+
+Example: a 5kg rice sack priced at ₱300 has a package size of `5` and inventory unit `KILOGRAM`. Selling `2500` `GRAM` stores the cashier-entered quantity, converts the stock deduction to `2.5` `KILOGRAM`, and records the permanent sale item plus inventory movement in the same transaction.

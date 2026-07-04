@@ -18,11 +18,30 @@ const emptyProduct: ProductCreatePayload = {
   name: "",
   brand: "",
   barcode: "",
+  inventoryUnit: "PIECE",
+  sellingUnit: "PIECE",
   costPrice: 0,
   retailPrice: 0,
   wholesalePrice: 0,
+  packageSize: 1,
+  wholesaleThreshold: 0,
   minimumStock: 0
 };
+
+const unitOptions = [
+  { value: "PIECE", label: "Piece" },
+  { value: "KILOGRAM", label: "Kilogram" },
+  { value: "GRAM", label: "Gram" },
+  { value: "LITER", label: "Liter" },
+  { value: "MILLILITER", label: "Milliliter" },
+  { value: "METER", label: "Meter" },
+  { value: "CENTIMETER", label: "Centimeter" },
+  { value: "PACK", label: "Pack" },
+  { value: "CASE", label: "Case" },
+  { value: "BUNDLE", label: "Bundle" },
+  { value: "BOTTLE", label: "Bottle" },
+  { value: "ROLL", label: "Roll" }
+];
 
 export function InventoryPage() {
   const queryClient = useQueryClient();
@@ -155,6 +174,40 @@ export function InventoryPage() {
             />
           </label>
           <label className="text-sm font-semibold">
+            Stock unit
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={product.inventoryUnit}
+              onChange={(event) =>
+                setProduct((current) => ({
+                  ...current,
+                  inventoryUnit: event.target.value,
+                  sellingUnit: current.sellingUnit === current.inventoryUnit ? event.target.value : current.sellingUnit
+                }))
+              }
+            >
+              {unitOptions.map((unit) => (
+                <option key={unit.value} value={unit.value}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
+            Selling unit
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={product.sellingUnit}
+              onChange={(event) => setProduct((current) => ({ ...current, sellingUnit: event.target.value }))}
+            >
+              {unitOptions.map((unit) => (
+                <option key={unit.value} value={unit.value}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
             Cost price
             <input
               className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
@@ -185,6 +238,29 @@ export function InventoryPage() {
               step="0.01"
               value={product.wholesalePrice}
               onChange={(event) => setProduct((current) => ({ ...current, wholesalePrice: Number(event.target.value) }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Package size
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0.001"
+              step="0.001"
+              value={product.packageSize}
+              onChange={(event) => setProduct((current) => ({ ...current, packageSize: Number(event.target.value) }))}
+              required
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Wholesale threshold
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              type="number"
+              min="0"
+              step="0.001"
+              value={product.wholesaleThreshold}
+              onChange={(event) => setProduct((current) => ({ ...current, wholesaleThreshold: Number(event.target.value) }))}
             />
           </label>
           <label className="text-sm font-semibold">
@@ -308,6 +384,7 @@ export function InventoryPage() {
               <th className="px-4 py-3">Product</th>
               <th className="px-4 py-3">SKU</th>
               <th className="px-4 py-3">Barcode</th>
+              <th className="px-4 py-3">Package</th>
               <th className="px-4 py-3">Retail</th>
               <th className="px-4 py-3">Wholesale</th>
               <th className="px-4 py-3">Status</th>
@@ -316,7 +393,7 @@ export function InventoryPage() {
           <tbody>
             {products.isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={6}>
+                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={7}>
                   Loading products...
                 </td>
               </tr>
@@ -329,6 +406,9 @@ export function InventoryPage() {
                   </td>
                   <td className="px-4 py-3">{item.sku}</td>
                   <td className="px-4 py-3">{item.barcodes.find((barcode) => barcode.isPrimary)?.value ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    {item.packageSize} {item.inventoryUnit.toLowerCase()}
+                  </td>
                   <td className="px-4 py-3">{formatCurrency(item.retailPrice)}</td>
                   <td className="px-4 py-3">{formatCurrency(item.wholesalePrice)}</td>
                   <td className="px-4 py-3">{item.status}</td>
@@ -336,7 +416,7 @@ export function InventoryPage() {
               ))
             ) : (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={6}>
+                <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={7}>
                   No products yet. Add your first product to start using inventory.
                 </td>
               </tr>

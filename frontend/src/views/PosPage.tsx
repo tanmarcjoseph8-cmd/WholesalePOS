@@ -8,9 +8,54 @@ type CartItem = {
   product: Product;
   warehouseId: string;
   quantity: number;
-  unitPrice: number;
+  soldUnit: string;
   discount: number;
 };
+
+const unitDefinitions: Record<string, { group: string; factor: number; label: string }> = {
+  KILOGRAM: { group: "weight", factor: 1, label: "kg" },
+  GRAM: { group: "weight", factor: 0.001, label: "g" },
+  LITER: { group: "volume", factor: 1, label: "L" },
+  MILLILITER: { group: "volume", factor: 0.001, label: "mL" },
+  METER: { group: "length", factor: 1, label: "m" },
+  CENTIMETER: { group: "length", factor: 0.01, label: "cm" },
+  PIECE: { group: "count", factor: 1, label: "pc" },
+  PACK: { group: "count", factor: 1, label: "pack" },
+  CASE: { group: "count", factor: 1, label: "case" },
+  BUNDLE: { group: "count", factor: 1, label: "bundle" },
+  BOTTLE: { group: "count", factor: 1, label: "bottle" },
+  ROLL: { group: "count", factor: 1, label: "roll" },
+  CUSTOM: { group: "custom", factor: 1, label: "unit" }
+};
+
+function compatibleUnits(inventoryUnit: string) {
+  const base = unitDefinitions[inventoryUnit];
+  if (!base) return [inventoryUnit];
+  return Object.entries(unitDefinitions)
+    .filter(([, definition]) => definition.group === base.group)
+    .map(([unit]) => unit);
+}
+
+function unitLabel(unit: string) {
+  return unitDefinitions[unit]?.label ?? unit.toLowerCase();
+}
+
+function toBaseQuantity(quantity: number, soldUnit: string, inventoryUnit: string) {
+  const sold = unitDefinitions[soldUnit];
+  const base = unitDefinitions[inventoryUnit];
+  if (!sold || !base || sold.group !== base.group) return quantity;
+  return (quantity * sold.factor) / base.factor;
+}
+
+function calculateLine(item: CartItem) {
+  const packageSize = Math.max(item.product.packageSize, 0.001);
+  const baseQuantity = toBaseQuantity(item.quantity, item.soldUnit, item.product.inventoryUnit);
+  const threshold = Math.max(item.product.wholesaleThreshold, 0);
+  const packagePrice = threshold > 0 && baseQuantity >= threshold ? item.product.wholesalePrice : item.product.retailPrice;
+  const unitPrice = packagePrice / packageSize;
+  const subtotal = unitPrice * baseQuantity;
+  return { baseQuantity, unitPrice, subtotal, total: Math.max(0, subtotal - item.discount) };
+}
 
 export function PosPage() {
   const queryClient = useQueryClient();
@@ -24,7 +69,7 @@ export function PosPage() {
   const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
   const defaultWarehouseId = warehouses.data?.[0]?.id ?? "";
 
-  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + calculateLine(item).subtotal, 0), [cart]);
   const discountTotal = useMemo(() => cart.reduce((sum, item) => sum + item.discount, 0), [cart]);
   const total = Math.max(0, subtotal - discountTotal);
   const paid = cashAmount + gcashAmount;
@@ -37,7 +82,7 @@ export function PosPage() {
           productId: item.product.id,
           warehouseId: item.warehouseId,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          soldUnit: item.soldUnit,
           discount: item.discount
         })),
         payments: [
@@ -64,7 +109,7 @@ export function PosPage() {
       if (existing) {
         return current.map((item) => (item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
       }
-      return [...current, { product, warehouseId: defaultWarehouseId, quantity: 1, unitPrice: product.retailPrice, discount: 0 }];
+      return [...current, { product, warehouseId: defaultWarehouseId, quantity: 1, soldUnit: product.sellingUnit, discount: 0 }];
     });
   }
 
@@ -72,6 +117,14 @@ export function PosPage() {
     setCart((current) =>
       current
         .map((item) => (item.product.id === productId ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item))
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function setQuantity(productId: string, quantity: number) {
+    setCart((current) =>
+      current
+        .map((item) => (item.product.id === productId ? { ...item, quantity: Math.max(0, quantity) } : item))
         .filter((item) => item.quantity > 0)
     );
   }
@@ -110,8 +163,10 @@ export function PosPage() {
                 <div className="font-bold">{product.name}</div>
                 <div className="mt-1 text-xs text-slate-500">{product.sku}</div>
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span>{formatCurrency(product.retailPrice)}</span>
-                  <span>{stockRow ? `${stockRow.quantity} left` : "No stock"}</span>
+                  <span>
+                    {formatCurrency(product.retailPrice)} / {product.packageSize} {unitLabel(product.inventoryUnit)}
+                  </span>
+                  <span>{stockRow ? `${stockRow.quantity} ${unitLabel(product.inventoryUnit)} left` : "No stock"}</span>
                 </div>
               </button>
             );
@@ -123,31 +178,58 @@ export function PosPage() {
         <h3 className="text-lg font-bold">Current Cart</h3>
         <div className="mt-5 max-h-80 space-y-3 overflow-auto">
           {cart.length ? (
-            cart.map((item) => (
+            cart.map((item) => {
+              const line = calculateLine(item);
+              const units = compatibleUnits(item.product.inventoryUnit);
+              return (
               <div key={item.product.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold">{item.product.name}</div>
-                    <div className="text-xs text-slate-500">{formatCurrency(item.unitPrice)} each</div>
+                    <div className="text-xs text-slate-500">
+                      {formatCurrency(line.unitPrice)} per {unitLabel(item.product.inventoryUnit)}
+                    </div>
                   </div>
                   <button className="focus-ring rounded-md p-2" onClick={() => setCart((current) => current.filter((cartItem) => cartItem.product.id !== item.product.id))}>
                     <Trash2 size={17} />
                   </button>
                 </div>
-                <div className="mt-3 flex items-center justify-between">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <button className="focus-ring rounded-md border border-slate-200 p-2 dark:border-slate-700" onClick={() => updateQuantity(item.product.id, -1)}>
                       <Minus size={16} />
                     </button>
-                    <span className="w-10 text-center font-bold">{item.quantity}</span>
+                    <input
+                      className="focus-ring h-10 w-20 rounded-md border border-slate-200 px-2 text-center font-bold dark:border-slate-700 dark:bg-slate-800"
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={item.quantity}
+                      onChange={(event) => setQuantity(item.product.id, Number(event.target.value))}
+                    />
                     <button className="focus-ring rounded-md border border-slate-200 p-2 dark:border-slate-700" onClick={() => updateQuantity(item.product.id, 1)}>
                       <Plus size={16} />
                     </button>
                   </div>
-                  <strong>{formatCurrency(item.unitPrice * item.quantity - item.discount)}</strong>
+                  <select
+                    className="focus-ring h-10 rounded-md border border-slate-200 px-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    value={item.soldUnit}
+                    onChange={(event) => setCart((current) => current.map((cartItem) => (cartItem.product.id === item.product.id ? { ...cartItem, soldUnit: event.target.value } : cartItem)))}
+                  >
+                    {units.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unitLabel(unit)}
+                      </option>
+                    ))}
+                  </select>
+                  <strong>{formatCurrency(line.total)}</strong>
+                </div>
+                <div className="mt-2 text-xs text-slate-500">
+                  Deducts {line.baseQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} {unitLabel(item.product.inventoryUnit)} from stock.
                 </div>
               </div>
-            ))
+            );
+            })
           ) : (
             <div className="grid h-40 place-items-center rounded-md border border-dashed border-slate-300 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
               No items added.

@@ -308,16 +308,19 @@ model Sale {
 }
 
 model SaleItem {
-  id        String  @id @default(cuid())
-  saleId    String
-  productId String
-  quantity  Decimal
-  unitPrice Decimal
-  discount  Decimal @default(0)
-  taxAmount Decimal @default(0)
-  lineTotal Decimal
-  sale      Sale    @relation(fields: [saleId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  id           String  @id @default(cuid())
+  saleId       String
+  productId    String
+  quantity     Decimal
+  soldQuantity Decimal @default(1)
+  soldUnit     String  @default("PIECE")
+  baseQuantity Decimal @default(1)
+  unitPrice    Decimal
+  discount     Decimal @default(0)
+  taxAmount    Decimal @default(0)
+  lineTotal    Decimal
+  sale         Sale    @relation(fields: [saleId], references: [id])
+  product      Product @relation(fields: [productId], references: [id])
 
   @@index([saleId])
   @@index([productId])

@@ -4,6 +4,7 @@ import { AppError } from "../../shared/app-error.js";
 import { buildPaginatedResponse, getPagination } from "../../shared/pagination.js";
 import type { Actor } from "../auth/actor.js";
 import { calculateNextStock } from "../inventory/inventory-calculations.js";
+import { calculateVariableSaleLine, type UnitCode } from "../inventory/unit-conversion.js";
 import type { SaleCreateInput, SaleListQuery } from "./sale.schemas.js";
 
 function toNumber(value: Prisma.Decimal | number) {
@@ -55,7 +56,17 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
     for (const item of input.items) {
       const product = await transaction.product.findFirst({
         where: { id: item.productId, deletedAt: null, status: "ACTIVE" },
-        select: { id: true, name: true, retailPrice: true, taxRate: true }
+        select: {
+          id: true,
+          name: true,
+          inventoryUnit: true,
+          sellingUnit: true,
+          packageSize: true,
+          retailPrice: true,
+          wholesalePrice: true,
+          wholesaleThreshold: true,
+          taxRate: true
+        }
       });
       if (!product) {
         throw new AppError(404, "PRODUCT_NOT_FOUND", "Product was not found.");
@@ -66,18 +77,39 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
         update: {},
         create: { productId: item.productId, warehouseId: item.warehouseId, quantity: 0 }
       });
-      const nextQuantity = calculateNextStock(toNumber(stock.quantity), item.quantity, "DECREASE");
-      const unitPrice = item.unitPrice ?? toNumber(product.retailPrice);
-      const gross = roundMoney(unitPrice * item.quantity);
+      const soldUnit = (item.soldUnit ?? product.sellingUnit) as UnitCode;
+      const baseUnit = product.inventoryUnit as UnitCode;
+      const packageSize = toNumber(product.packageSize);
+      const baseQuantityForPricing = calculateVariableSaleLine({
+        packagePrice: toNumber(product.retailPrice),
+        packageSize,
+        soldQuantity: item.quantity,
+        soldUnit,
+        inventoryUnit: baseUnit
+      }).baseQuantity;
+      const packagePrice =
+        toNumber(product.wholesaleThreshold) > 0 && baseQuantityForPricing >= toNumber(product.wholesaleThreshold)
+          ? toNumber(product.wholesalePrice)
+          : toNumber(product.retailPrice);
+      const saleLine = calculateVariableSaleLine({
+        packagePrice,
+        packageSize,
+        soldQuantity: item.quantity,
+        soldUnit,
+        inventoryUnit: baseUnit
+      });
+      const nextQuantity = calculateNextStock(toNumber(stock.quantity), saleLine.baseQuantity, "DECREASE");
+      const unitPrice = item.unitPrice ?? saleLine.unitPrice;
+      const gross = roundMoney(unitPrice * saleLine.baseQuantity);
       const lineDiscount = Math.min(item.discount, gross);
       const taxable = gross - lineDiscount;
       const taxAmount = roundMoney(taxable * toNumber(product.taxRate));
       const lineTotal = roundMoney(taxable + taxAmount);
 
-      preparedItems.push({ input: item, product, stock, nextQuantity, unitPrice, discount: lineDiscount, taxAmount, lineTotal });
+      preparedItems.push({ input: item, product, stock, nextQuantity, soldUnit, baseQuantity: saleLine.baseQuantity, unitPrice, discount: lineDiscount, taxAmount, lineTotal });
     }
 
-    const subtotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.unitPrice * item.input.quantity, 0));
+    const subtotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.unitPrice * item.baseQuantity, 0));
     const discountTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.discount, 0));
     const taxTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.taxAmount, 0));
     const grandTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.lineTotal, 0));
@@ -102,7 +134,10 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
         items: {
           create: preparedItems.map((item) => ({
             productId: item.input.productId,
-            quantity: item.input.quantity,
+            quantity: item.baseQuantity,
+            soldQuantity: item.input.quantity,
+            soldUnit: item.soldUnit,
+            baseQuantity: item.baseQuantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
             taxAmount: item.taxAmount,
@@ -133,7 +168,7 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
           productId: item.input.productId,
           warehouseId: item.input.warehouseId,
           type: "SALE",
-          quantity: -item.input.quantity,
+          quantity: -item.baseQuantity,
           referenceType: "Sale",
           referenceId: sale.id,
           reason: `Sale ${sale.receiptNumber}`,
