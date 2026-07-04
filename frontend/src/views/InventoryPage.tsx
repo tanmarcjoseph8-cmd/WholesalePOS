@@ -61,6 +61,7 @@ export function InventoryPage() {
     unitCost: 0,
     reason: "Manual stock update"
   });
+  const [stockMessage, setStockMessage] = useState("");
   const products = useQuery({
     queryKey: ["products", search],
     queryFn: () => fetchProducts(search)
@@ -74,14 +75,17 @@ export function InventoryPage() {
 
   const createMutation = useMutation({
     mutationFn: createProduct,
-    onSuccess: async () => {
+    onSuccess: async (createdProduct) => {
       setProduct(emptyProduct);
       setIsAdding(false);
+      setStockForm((current) => ({ ...current, productId: createdProduct.id }));
+      setStockMessage(`${createdProduct.name} is selected for stock entry.`);
       await queryClient.invalidateQueries({ queryKey: ["products"] });
     }
   });
   const stockMutation = useMutation({
     mutationFn: async () => {
+      setStockMessage("");
       if (stockForm.type === "COUNT") {
         return adjustInventoryCount({
           productId: stockForm.productId,
@@ -101,8 +105,10 @@ export function InventoryPage() {
       });
     },
     onSuccess: async () => {
+      setStockMessage("Inventory saved. Stock balances and history were updated.");
       setStockForm((current) => ({ ...current, quantity: 0, unitCost: 0, reason: "Manual stock update" }));
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
         queryClient.invalidateQueries({ queryKey: ["stock"] }),
         queryClient.invalidateQueries({ queryKey: ["inventory-movements"] })
       ]);
@@ -110,6 +116,7 @@ export function InventoryPage() {
   });
 
   const productCount = useMemo(() => products.data?.pagination.total ?? 0, [products.data?.pagination.total]);
+  const canSaveStock = Boolean(stockForm.productId && selectedWarehouseId && stockForm.quantity > 0 && stockForm.reason.trim().length >= 3);
 
   return (
     <section className="space-y-6">
@@ -383,9 +390,15 @@ export function InventoryPage() {
             required
           />
         </label>
-        <button className="focus-ring mt-7 h-11 rounded-md bg-mint px-4 text-sm font-bold text-white" disabled={stockMutation.isPending || !selectedWarehouseId}>
+        <button className="focus-ring mt-7 h-11 rounded-md bg-mint px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={stockMutation.isPending || !canSaveStock}>
           {stockMutation.isPending ? "Saving..." : "Save Stock"}
         </button>
+        {!stockForm.productId || stockForm.quantity <= 0 ? (
+          <p className="rounded-md bg-amber/10 p-3 text-sm font-semibold text-amber md:col-span-2 xl:col-span-6">
+            Select a product and enter a quantity greater than 0 before saving stock.
+          </p>
+        ) : null}
+        {stockMessage ? <p className="rounded-md bg-mint/10 p-3 text-sm font-semibold text-mint md:col-span-2 xl:col-span-6">{stockMessage}</p> : null}
         {stockMutation.error ? <p className="rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose md:col-span-2 xl:col-span-6">{stockMutation.error.message}</p> : null}
       </form>
 
