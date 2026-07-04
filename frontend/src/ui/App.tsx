@@ -51,6 +51,15 @@ function saveNotificationIds(key: string, ids: string[]) {
   window.localStorage.setItem(key, JSON.stringify(ids));
 }
 
+function keepOnlyCurrentNotificationIds(storedIds: string[], currentIds: string[]) {
+  const currentIdSet = new Set(currentIds);
+  return storedIds.filter((id) => currentIdSet.has(id));
+}
+
+function sameNotificationIds(left: string[], right: string[]) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
 function AuthScreen({ onSession }: { onSession: (session: AuthSession) => void }) {
   const queryClient = useQueryClient();
   const setupStatus = useQuery({ queryKey: ["setup-status"], queryFn: fetchSetupStatus });
@@ -208,7 +217,7 @@ export function App() {
     if (health.isLoading) return "Checking";
     return health.data?.status === "ok" ? "Online" : "Offline";
   }, [health.data?.status, health.isLoading]);
-  const activeNotifications = useMemo(() => {
+  const currentNotifications = useMemo(() => {
     const items: NotificationItem[] = [];
     for (const stock of notificationStock.data?.items ?? []) {
       const isOut = stock.quantity <= 0;
@@ -222,8 +231,13 @@ export function App() {
     if (!health.isLoading && health.data?.status !== "ok") {
       items.push({ id: "connection-offline", title: "Connection alert", body: "The local backend is offline.", tone: "text-rose" });
     }
-    return items.filter((item) => !dismissedNotificationIds.includes(item.id));
-  }, [dismissedNotificationIds, health.data?.status, health.isLoading, notificationStock.data?.items]);
+    return items;
+  }, [health.data?.status, health.isLoading, notificationStock.data?.items]);
+  const currentNotificationIds = useMemo(() => currentNotifications.map((notification) => notification.id), [currentNotifications]);
+  const activeNotifications = useMemo(
+    () => currentNotifications.filter((item) => !dismissedNotificationIds.includes(item.id)),
+    [currentNotifications, dismissedNotificationIds]
+  );
   const unreadNotificationCount = useMemo(
     () => activeNotifications.filter((notification) => !readNotificationIds.includes(notification.id)).length,
     [activeNotifications, readNotificationIds]
@@ -237,6 +251,23 @@ export function App() {
     if (!session) return undefined;
     return connectRealtimeUpdates(queryClient);
   }, [queryClient, session]);
+
+  useEffect(() => {
+    if (!notificationStock.isSuccess || health.isLoading) return;
+
+    setDismissedNotificationIds((storedIds) => {
+      const nextIds = keepOnlyCurrentNotificationIds(storedIds, currentNotificationIds);
+      if (sameNotificationIds(storedIds, nextIds)) return storedIds;
+      saveNotificationIds(dismissedNotificationsKey, nextIds);
+      return nextIds;
+    });
+    setReadNotificationIds((storedIds) => {
+      const nextIds = keepOnlyCurrentNotificationIds(storedIds, currentNotificationIds);
+      if (sameNotificationIds(storedIds, nextIds)) return storedIds;
+      saveNotificationIds(readNotificationsKey, nextIds);
+      return nextIds;
+    });
+  }, [currentNotificationIds, health.isLoading, notificationStock.isSuccess]);
 
   function openNotifications() {
     setNotificationsOpen((value) => {
