@@ -66,6 +66,10 @@ export function InventoryPage() {
     queryKey: ["products", search],
     queryFn: () => fetchProducts(search)
   });
+  const stockProducts = useQuery({
+    queryKey: ["products", "stock-selector"],
+    queryFn: () => fetchProducts("")
+  });
   const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
   const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
   const lowStock = useQuery({ queryKey: ["stock", "low"], queryFn: () => fetchStock("", true) });
@@ -319,7 +323,7 @@ export function InventoryPage() {
             required
           >
             <option value="">Select product</option>
-            {products.data?.items.map((item) => (
+            {stockProducts.data?.items.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name} ({item.sku})
               </option>

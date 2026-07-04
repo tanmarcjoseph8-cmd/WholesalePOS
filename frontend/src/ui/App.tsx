@@ -9,7 +9,18 @@ import { ReportsPage } from "../views/ReportsPage";
 import { SettingsPage } from "../views/SettingsPage";
 import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
-import { clearSession, fetchCurrentUser, fetchSetupStatus, loadSession, login, saveSession, setupOwner, type AuthSession } from "../lib/api";
+import {
+  clearSession,
+  fetchCurrentUser,
+  fetchSetupStatus,
+  fetchStock,
+  loadSession,
+  login,
+  saveSession,
+  setupOwner,
+  verifyPassword,
+  type AuthSession
+} from "../lib/api";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: ChartNoAxesCombined },
@@ -119,15 +130,70 @@ function AuthScreen({ onSession }: { onSession: (session: AuthSession) => void }
   );
 }
 
+function InventoryPasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [password, setPassword] = useState("");
+  const passwordMutation = useMutation({
+    mutationFn: verifyPassword,
+    onSuccess: () => {
+      setPassword("");
+      onUnlock();
+    }
+  });
+
+  return (
+    <section className="grid min-h-[calc(100vh-8rem)] place-items-center">
+      <form
+        className="w-full max-w-md rounded-md border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        onSubmit={(event) => {
+          event.preventDefault();
+          passwordMutation.mutate({ password });
+        }}
+      >
+        <h2 className="text-xl font-bold">Unlock Inventory</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Enter your password to manage products and stock.</p>
+        <label className="mt-5 block text-sm font-semibold">
+          Password
+          <input
+            className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoFocus
+            required
+          />
+        </label>
+        {passwordMutation.error ? <p className="mt-3 rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose">{passwordMutation.error.message}</p> : null}
+        <button className="focus-ring mt-5 h-11 w-full rounded-md bg-ocean px-4 text-sm font-bold text-white" disabled={passwordMutation.isPending}>
+          {passwordMutation.isPending ? "Checking..." : "Unlock Inventory"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 export function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
+  const [inventoryUnlocked, setInventoryUnlocked] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser, enabled: Boolean(session) });
   const health = useApiHealth();
+  const notificationStock = useQuery({ queryKey: ["notifications", "low-stock"], queryFn: () => fetchStock("", true), enabled: Boolean(session) });
   const statusLabel = useMemo(() => {
     if (health.isLoading) return "Checking";
     return health.data?.status === "ok" ? "Online" : "Offline";
   }, [health.data?.status, health.isLoading]);
+  const notifications = useMemo(() => {
+    const items: Array<{ title: string; body: string; tone: string }> = [];
+    const lowStockCount = notificationStock.data?.pagination.total ?? 0;
+    if (lowStockCount > 0) {
+      items.push({ title: "Inventory alert", body: `${lowStockCount} product${lowStockCount === 1 ? "" : "s"} low or out of stock.`, tone: "text-amber" });
+    }
+    if (!health.isLoading && health.data?.status !== "ok") {
+      items.push({ title: "Connection alert", body: "The local backend is offline.", tone: "text-rose" });
+    }
+    return items;
+  }, [health.data?.status, health.isLoading, notificationStock.data?.pagination.total]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -186,12 +252,36 @@ export function App() {
             <span className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700">
               {statusLabel}
             </span>
-            <button
-              className="focus-ring grid h-11 w-11 place-items-center rounded-md border border-slate-200 dark:border-slate-700"
-              aria-label="Notifications"
-            >
-              <Bell size={19} />
-            </button>
+            <div className="relative">
+              <button
+                className="focus-ring relative grid h-11 w-11 place-items-center rounded-md border border-slate-200 dark:border-slate-700"
+                aria-label="Notifications"
+                onClick={() => setNotificationsOpen((value) => !value)}
+              >
+                <Bell size={19} />
+                {notifications.length ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose" /> : null}
+              </button>
+              {notificationsOpen ? (
+                <section className="absolute right-0 top-13 z-30 w-80 rounded-md border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-bold">Notifications</h2>
+                    <span className="text-xs text-slate-500">{notifications.length ? `${notifications.length} active` : "Clear"}</span>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {notifications.length ? (
+                      notifications.map((notification) => (
+                        <article key={notification.title} className="rounded-md bg-slate-100 p-3 text-sm dark:bg-slate-800">
+                          <p className={`font-bold ${notification.tone}`}>{notification.title}</p>
+                          <p className="mt-1 text-slate-600 dark:text-slate-300">{notification.body}</p>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">No notifications.</p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+            </div>
             <button
               className="focus-ring grid h-11 w-11 place-items-center rounded-md border border-slate-200 dark:border-slate-700"
               aria-label="Toggle theme"
@@ -203,6 +293,7 @@ export function App() {
               className="focus-ring h-11 rounded-md border border-slate-200 px-3 text-sm font-semibold dark:border-slate-700"
               onClick={() => {
                 clearSession();
+                setInventoryUnlocked(false);
                 setSession(null);
               }}
             >
@@ -215,7 +306,10 @@ export function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
-            <Route path="/inventory" element={canManageProducts ? <InventoryPage /> : <DashboardPage />} />
+            <Route
+              path="/inventory"
+              element={canManageProducts ? inventoryUnlocked ? <InventoryPage /> : <InventoryPasswordGate onUnlock={() => setInventoryUnlocked(true)} /> : <DashboardPage />}
+            />
             <Route path="/reports" element={canUseSales ? <ReportsPage /> : <DashboardPage />} />
             <Route path="/settings" element={canManageSettings ? <SettingsPage /> : <DashboardPage />} />
             <Route path="/users" element={canManageUsers ? <UsersPage /> : <DashboardPage />} />

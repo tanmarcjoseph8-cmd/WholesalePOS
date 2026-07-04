@@ -183,6 +183,15 @@ try {
     }
   });
 
+  const passwordCheck = await requestJson(port, "/api/auth/verify-password", {
+    method: "POST",
+    token: session.accessToken,
+    body: { password: "strongpassword123" }
+  });
+  if (passwordCheck?.verified !== true) {
+    throw new Error("Password verification smoke test failed.");
+  }
+
   const product = await requestJson(port, "/api/products", {
     method: "POST",
     token: session.accessToken,

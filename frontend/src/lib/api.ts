@@ -43,6 +43,10 @@ const setupStatusSchema = z.object({
   requiresSetup: z.boolean()
 });
 
+const passwordVerificationSchema = z.object({
+  verified: z.boolean()
+});
+
 const productSchema = z.object({
   id: z.string(),
   sku: z.string(),
@@ -300,6 +304,15 @@ export async function login(input: { email: string; password: string; rememberMe
 
 export async function fetchCurrentUser() {
   return currentUserSchema.parse(await apiRequest("/api/auth/me"));
+}
+
+export async function verifyPassword(input: { password: string }) {
+  return passwordVerificationSchema.parse(
+    await apiRequest("/api/auth/verify-password", {
+      method: "POST",
+      body: JSON.stringify(input)
+    })
+  );
 }
 
 export async function fetchUsers() {

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../shared/app-error.js";
-import type { LoginRequest, LogoutRequest, RefreshTokenRequest, SetupOwnerRequest } from "./auth.schemas.js";
+import type { LoginRequest, LogoutRequest, RefreshTokenRequest, SetupOwnerRequest, VerifyPasswordRequest } from "./auth.schemas.js";
 import { hashPassword, verifyPassword } from "./password.service.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "./token.service.js";
 
@@ -320,4 +320,33 @@ export async function getCurrentUser(userId: string) {
     storeId: user.storeId,
     permissions: user.role.permissions.map((entry: { permission: { key: string } }) => entry.permission.key)
   };
+}
+
+export async function verifyCurrentUserPassword(userId: string, input: VerifyPasswordRequest, metadata: { ipAddress?: string; userAgent?: string }) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, passwordHash: true, deletedAt: true, isActive: true, status: true }
+  });
+
+  const passwordIsValid = user ? await verifyPassword(input.password, user.passwordHash) : false;
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user?.id,
+      action: passwordIsValid ? "INVENTORY_PASSWORD_CONFIRMED" : "INVENTORY_PASSWORD_FAILED",
+      entityType: "User",
+      entityId: user?.id,
+      metadata: {
+        email: user?.email,
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent
+      }
+    }
+  });
+
+  if (!user || !passwordIsValid || user.deletedAt || !user.isActive || user.status !== "ACTIVE") {
+    throw new AppError(401, "INVALID_PASSWORD", "The password is incorrect.");
+  }
+
+  return { verified: true };
 }

@@ -2,8 +2,8 @@ import { Router } from "express";
 import { loginRateLimit } from "../../middleware/rate-limit.js";
 import { validateBody } from "../../shared/validate.js";
 import { getRequestAuth, requireAuth } from "./auth.middleware.js";
-import { loginSchema, logoutSchema, refreshTokenSchema, setupOwnerSchema } from "./auth.schemas.js";
-import { getCurrentUser, getSetupStatus, login, logout, refreshSession, setupOwner } from "./auth.service.js";
+import { loginSchema, logoutSchema, refreshTokenSchema, setupOwnerSchema, verifyPasswordSchema } from "./auth.schemas.js";
+import { getCurrentUser, getSetupStatus, login, logout, refreshSession, setupOwner, verifyCurrentUserPassword } from "./auth.service.js";
 
 export const authRouter = Router();
 
@@ -76,6 +76,25 @@ authRouter.get("/me", requireAuth, async (request, response, next) => {
     }
 
     response.json(await getCurrentUser(auth.userId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/verify-password", requireAuth, validateBody(verifyPasswordSchema), async (request, response, next) => {
+  try {
+    const auth = getRequestAuth(request);
+    if (!auth) {
+      response.status(401).json({ error: "AUTHENTICATION_REQUIRED", message: "Authentication is required." });
+      return;
+    }
+
+    response.json(
+      await verifyCurrentUserPassword(auth.userId, request.body, {
+        ipAddress: request.ip,
+        userAgent: request.get("user-agent")
+      })
+    );
   } catch (error) {
     next(error);
   }
