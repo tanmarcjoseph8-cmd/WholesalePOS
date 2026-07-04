@@ -2,8 +2,8 @@ import { Router } from "express";
 import { getActor } from "../auth/actor.js";
 import { requireAnyPermission, requireAuth, requirePermission } from "../auth/auth.middleware.js";
 import { asyncHandler } from "../../shared/async-handler.js";
-import { createProduct, deleteProduct, getProduct, listProducts, updateProduct } from "./product.service.js";
-import { productCreateSchema, productIdParamSchema, productListQuerySchema, productUpdateSchema } from "./product.schemas.js";
+import { createProduct, deleteProduct, getProduct, importProducts, listProducts, updateProduct } from "./product.service.js";
+import { productCreateSchema, productIdParamSchema, productImportSchema, productListQuerySchema, productUpdateSchema } from "./product.schemas.js";
 
 export const productRouter = Router();
 
@@ -24,6 +24,15 @@ productRouter.post(
   asyncHandler(async (request, response) => {
     const input = productCreateSchema.parse(request.body);
     response.status(201).json(await createProduct(input, getActor(request)));
+  })
+);
+
+productRouter.post(
+  "/import",
+  requirePermission("products.manage"),
+  asyncHandler(async (request, response) => {
+    const input = productImportSchema.parse(request.body);
+    response.status(201).json(await importProducts(input, getActor(request)));
   })
 );
 

@@ -14,6 +14,10 @@ describe("variable unit conversion", () => {
     expect(convertQuantity(750, "MILLILITER", "LITER")).toBe(0.75);
   });
 
+  it("converts yards into meter inventory quantity", () => {
+    expect(convertQuantity(2, "YARD", "METER")).toBe(1.8288);
+  });
+
   it("calculates partial rice sale from a 5kg package price", () => {
     expect(
       calculateVariableSaleLine({

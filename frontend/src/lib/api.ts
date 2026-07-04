@@ -211,6 +211,13 @@ const paginatedMovementsSchema = z.object({
   pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
 });
 
+const productImportResultSchema = z.object({
+  createdCount: z.number(),
+  failedCount: z.number(),
+  created: z.array(z.object({ rowNumber: z.number(), id: z.string(), name: z.string(), sku: z.string() })),
+  errors: z.array(z.object({ rowNumber: z.number(), name: z.string(), message: z.string() }))
+});
+
 export type AuthSession = z.infer<typeof authSessionSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type ManagedUser = z.infer<typeof managedUserSchema>;
@@ -239,6 +246,13 @@ export type ProductCreatePayload = {
   wholesaleThreshold: number;
   minimumStock: number;
 };
+
+export type ProductImportPayload = ProductCreatePayload & {
+  initialStock: number;
+  unitCost?: number | null;
+};
+
+export type ProductImportResult = z.infer<typeof productImportResultSchema>;
 
 export type ProductUpdatePayload = ProductCreatePayload & {
   id: string;
@@ -514,6 +528,49 @@ export async function createProduct(input: ProductCreatePayload) {
         location: null,
         notes: null,
         barcodes
+      })
+    })
+  );
+}
+
+export async function importProducts(input: { warehouseId?: string; rows: ProductImportPayload[] }) {
+  return productImportResultSchema.parse(
+    await apiRequest("/api/products/import", {
+      method: "POST",
+      body: JSON.stringify({
+        warehouseId: input.warehouseId,
+        rows: input.rows.map((row) => {
+          const barcodes = row.barcode?.trim() ? [{ value: row.barcode.trim(), isPrimary: true }] : [];
+          return {
+            sku: row.sku?.trim() ? row.sku.trim() : undefined,
+            name: row.name,
+            brand: row.brand?.trim() ? row.brand.trim() : null,
+            description: null,
+            imageUrl: null,
+            categoryId: null,
+            supplierId: null,
+            inventoryUnit: row.inventoryUnit,
+            sellingUnit: row.sellingUnit,
+            unitRatioToBase: 1,
+            costPrice: row.costPrice,
+            retailPrice: row.retailPrice,
+            wholesalePrice: row.wholesalePrice,
+            vipPrice: row.wholesalePrice,
+            packageSize: row.packageSize,
+            taxRate: 0,
+            wholesaleThreshold: row.wholesaleThreshold,
+            minimumStock: row.minimumStock,
+            maximumStock: null,
+            status: "ACTIVE",
+            expiresAt: null,
+            batchNumber: null,
+            location: null,
+            notes: null,
+            barcodes,
+            initialStock: row.initialStock,
+            unitCost: row.unitCost ?? row.costPrice
+          };
+        })
       })
     })
   );

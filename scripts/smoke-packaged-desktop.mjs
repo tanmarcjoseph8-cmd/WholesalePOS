@@ -274,6 +274,52 @@ try {
     throw new Error(`Zero-stock balance visibility failed. Expected No Barcode Product at 0, got ${zeroStockQuantity}.`);
   }
 
+  const importResult = await requestJson(port, "/api/products/import", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      warehouseId,
+      rows: [
+        {
+          name: "Imported Case Product",
+          description: null,
+          imageUrl: null,
+          brand: "Smoke",
+          categoryId: null,
+          supplierId: null,
+          inventoryUnit: "CASE",
+          sellingUnit: "CASE",
+          unitRatioToBase: 1,
+          costPrice: 100,
+          retailPrice: 140,
+          wholesalePrice: 125,
+          vipPrice: 125,
+          packageSize: 1,
+          taxRate: 0,
+          wholesaleThreshold: 0,
+          minimumStock: 3,
+          maximumStock: null,
+          status: "ACTIVE",
+          expiresAt: null,
+          batchNumber: null,
+          location: null,
+          notes: null,
+          barcodes: [{ value: "987654321000", isPrimary: true }],
+          initialStock: 7,
+          unitCost: 100
+        }
+      ]
+    }
+  });
+  if (importResult?.createdCount !== 1 || importResult?.failedCount !== 0) {
+    throw new Error("Product import smoke test failed.");
+  }
+  const importedStock = await requestJson(port, `/api/inventory/stock?productId=${importResult.created[0].id}`, { token: session.accessToken });
+  const importedStockQuantity = importedStock?.items?.[0]?.quantity;
+  if (Math.abs(Number(importedStockQuantity) - 7) > 0.0001) {
+    throw new Error(`Product import initial stock failed. Expected 7, got ${importedStockQuantity}.`);
+  }
+
   await requestJson(port, "/api/inventory/movements", {
     method: "POST",
     token: session.accessToken,

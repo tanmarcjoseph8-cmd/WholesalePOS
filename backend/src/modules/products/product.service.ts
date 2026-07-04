@@ -6,7 +6,8 @@ import { realtimeEvents } from "../../realtime/events.js";
 import { AppError } from "../../shared/app-error.js";
 import { buildPaginatedResponse, getPagination } from "../../shared/pagination.js";
 import type { Actor } from "../auth/actor.js";
-import type { ProductCreateInput, ProductListQuery, ProductUpdateInput } from "./product.schemas.js";
+import { createInventoryMovement } from "../inventory/inventory.service.js";
+import type { ProductCreateInput, ProductImportInput, ProductListQuery, ProductUpdateInput } from "./product.schemas.js";
 import { findPriceChanges, type PriceFields } from "./product-pricing.js";
 
 const productInclude = {
@@ -193,6 +194,53 @@ export async function createProduct(input: ProductCreateInput, actor: Actor) {
   });
 
   return product;
+}
+
+export async function importProducts(input: ProductImportInput, actor: Actor) {
+  const warehouse = input.warehouseId
+    ? await prisma.warehouse.findFirst({ where: { id: input.warehouseId, deletedAt: null }, select: { id: true } })
+    : await prisma.warehouse.findFirst({ where: { deletedAt: null, storeId: actor.storeId ?? undefined }, orderBy: { code: "asc" }, select: { id: true } });
+
+  if (!warehouse) {
+    throw new AppError(400, "WAREHOUSE_REQUIRED", "Create or select a warehouse before importing products.");
+  }
+
+  const created: Array<{ rowNumber: number; id: string; name: string; sku: string }> = [];
+  const errors: Array<{ rowNumber: number; name: string; message: string }> = [];
+
+  for (const [index, row] of input.rows.entries()) {
+    const rowNumber = index + 2;
+    const { initialStock, unitCost, ...productInput } = row;
+
+    try {
+      const product = await createProduct(productInput, actor);
+      if (initialStock > 0) {
+        await createInventoryMovement(
+          {
+            productId: product.id,
+            warehouseId: warehouse.id,
+            type: "STOCK_IN",
+            quantity: initialStock,
+            unitCost: unitCost ?? Number(product.costPrice),
+            referenceType: "PRODUCT_IMPORT",
+            referenceId: product.id,
+            reason: "Initial stock from product import"
+          },
+          actor
+        );
+      }
+      created.push({ rowNumber, id: product.id, name: product.name, sku: product.sku });
+    } catch (error) {
+      errors.push({ rowNumber, name: productInput.name, message: error instanceof Error ? error.message : "Product could not be imported." });
+    }
+  }
+
+  return {
+    createdCount: created.length,
+    failedCount: errors.length,
+    created,
+    errors
+  };
 }
 
 export async function updateProduct(productId: string, input: ProductUpdateInput, actor: Actor) {

@@ -6,6 +6,7 @@ const unitTypeSchema = z.enum([
   "LITER",
   "MILLILITER",
   "METER",
+  "YARD",
   "CENTIMETER",
   "PIECE",
   "PACK",

@@ -19,6 +19,7 @@ const unitDefinitions: Record<string, { group: string; factor: number; label: st
   LITER: { group: "volume", factor: 1, label: "L" },
   MILLILITER: { group: "volume", factor: 0.001, label: "mL" },
   METER: { group: "length", factor: 1, label: "m" },
+  YARD: { group: "length", factor: 0.9144, label: "yd" },
   CENTIMETER: { group: "length", factor: 0.01, label: "cm" },
   PIECE: { group: "count", factor: 1, label: "pc" },
   PACK: { group: "count", factor: 1, label: "pack" },

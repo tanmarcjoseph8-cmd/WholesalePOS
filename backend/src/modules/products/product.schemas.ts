@@ -6,6 +6,7 @@ const unitTypeSchema = z.enum([
   "LITER",
   "MILLILITER",
   "METER",
+  "YARD",
   "CENTIMETER",
   "PIECE",
   "PACK",
@@ -71,10 +72,21 @@ export const productListQuerySchema = z.object({
   supplierId: z.string().trim().min(1).optional()
 });
 
+export const productImportRowSchema = productCreateSchema.extend({
+  initialStock: decimalQuantity.default(0),
+  unitCost: money.optional().nullable()
+});
+
+export const productImportSchema = z.object({
+  warehouseId: z.string().trim().min(1).optional(),
+  rows: z.array(productImportRowSchema).min(1).max(2000)
+});
+
 export const productIdParamSchema = z.object({
   id: z.string().trim().min(1)
 });
 
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
+export type ProductImportInput = z.infer<typeof productImportSchema>;
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
