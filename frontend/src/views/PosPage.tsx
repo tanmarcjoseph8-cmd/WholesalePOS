@@ -194,6 +194,11 @@ export function PosPage() {
               Product search could not load. Please sign in again or restart the app.
             </div>
           ) : null}
+          {stock.error ? (
+            <div className="rounded-md border border-amber/30 bg-amber/10 p-4 text-sm font-semibold text-amber sm:col-span-2 lg:col-span-3">
+              Stock balances could not load. Product cards may show 0 until the app reconnects.
+            </div>
+          ) : null}
           {!products.isLoading && !products.error && products.data?.items.length === 0 ? (
             <div className="rounded-md border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 sm:col-span-2 lg:col-span-3">
               No matching product found.
