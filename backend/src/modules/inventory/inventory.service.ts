@@ -16,9 +16,35 @@ import type {
 } from "./inventory.schemas.js";
 
 const stockInclude = {
-  product: { select: { id: true, sku: true, name: true, minimumStock: true, inventoryUnit: true } },
+  product: { select: { id: true, sku: true, name: true, costPrice: true, minimumStock: true, inventoryUnit: true } },
   warehouse: { select: { id: true, name: true, code: true, storeId: true } }
 } satisfies Prisma.InventoryStockInclude;
+
+type StockBalanceQuery = Pick<InventoryListQuery, "productId" | "warehouseId" | "search"> & {
+  lowStockOnly?: boolean;
+  storeId?: string;
+};
+
+type StockBalanceRow = {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: Prisma.Decimal | number;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    costPrice: Prisma.Decimal | number;
+    minimumStock: Prisma.Decimal | number;
+    inventoryUnit: string;
+  };
+  warehouse: {
+    id: string;
+    name: string;
+    code: string;
+    storeId: string;
+  };
+};
 
 function toNumber(value: Prisma.Decimal | number) {
   return Number(value);
@@ -57,46 +83,85 @@ export async function listWarehouses() {
   });
 }
 
-export async function listStock(query: InventoryListQuery) {
-  const { page, pageSize, skip, take } = getPagination(query);
-  const where: Prisma.InventoryStockWhereInput = {
-    productId: query.productId,
-    warehouseId: query.warehouseId,
+export async function listStockRows(query: StockBalanceQuery = {}) {
+  const productWhere: Prisma.ProductWhereInput = {
+    id: query.productId,
+    deletedAt: null,
+    status: "ACTIVE",
     ...(query.search
       ? {
-          product: {
-            OR: [
-              { name: { contains: query.search } },
-              { sku: { contains: query.search } },
-              { barcodes: { some: { value: { contains: query.search } } } }
-            ]
-          }
+          OR: [
+            { name: { contains: query.search } },
+            { sku: { contains: query.search } },
+            { barcodes: { some: { value: { contains: query.search } } } }
+          ]
         }
       : {})
   };
+  const warehouseWhere: Prisma.WarehouseWhereInput = {
+    id: query.warehouseId,
+    storeId: query.storeId,
+    deletedAt: null
+  };
 
-  if (query.lowStockOnly) {
-    const rows = await prisma.inventoryStock.findMany({
-      where,
-      include: stockInclude,
-      orderBy: [{ product: { name: "asc" } }, { warehouse: { code: "asc" } }]
-    });
-    const lowStockRows = rows.filter((row) => toNumber(row.quantity) <= toNumber(row.product.minimumStock));
-    return buildPaginatedResponse(lowStockRows.slice(skip, skip + take), lowStockRows.length, page, pageSize);
-  }
-
-  const [items, total] = await prisma.$transaction([
-    prisma.inventoryStock.findMany({
-      where,
-      include: stockInclude,
-      orderBy: [{ product: { name: "asc" } }, { warehouse: { code: "asc" } }],
-      skip,
-      take
+  const [products, warehouses] = await prisma.$transaction([
+    prisma.product.findMany({
+      where: productWhere,
+      select: { id: true, sku: true, name: true, costPrice: true, minimumStock: true, inventoryUnit: true },
+      orderBy: [{ name: "asc" }, { sku: "asc" }]
     }),
-    prisma.inventoryStock.count({ where })
+    prisma.warehouse.findMany({
+      where: warehouseWhere,
+      select: { id: true, name: true, code: true, storeId: true },
+      orderBy: [{ code: "asc" }, { name: "asc" }]
+    })
   ]);
 
-  return buildPaginatedResponse(items, total, page, pageSize);
+  if (!products.length || !warehouses.length) {
+    return [];
+  }
+
+  const stockRows = await prisma.inventoryStock.findMany({
+    where: {
+      productId: { in: products.map((product) => product.id) },
+      warehouseId: { in: warehouses.map((warehouse) => warehouse.id) }
+    },
+    include: stockInclude
+  });
+  const stockByProductWarehouse = new Map(stockRows.map((row) => [`${row.productId}:${row.warehouseId}`, row]));
+  const rows: StockBalanceRow[] = [];
+
+  for (const product of products) {
+    for (const warehouse of warehouses) {
+      const existingStock = stockByProductWarehouse.get(`${product.id}:${warehouse.id}`);
+      rows.push(
+        existingStock ?? {
+          id: `zero-${product.id}-${warehouse.id}`,
+          productId: product.id,
+          warehouseId: warehouse.id,
+          quantity: 0,
+          product,
+          warehouse
+        }
+      );
+    }
+  }
+
+  const visibleRows = query.lowStockOnly
+    ? rows.filter((row) => toNumber(row.quantity) <= toNumber(row.product.minimumStock))
+    : rows;
+
+  return visibleRows.sort((left, right) => {
+    const productOrder = left.product.name.localeCompare(right.product.name);
+    return productOrder || left.warehouse.code.localeCompare(right.warehouse.code);
+  });
+}
+
+export async function listStock(query: InventoryListQuery) {
+  const { page, pageSize, skip, take } = getPagination(query);
+  const rows = await listStockRows(query);
+
+  return buildPaginatedResponse(rows.slice(skip, skip + take), rows.length, page, pageSize);
 }
 
 export async function listMovements(query: MovementListQuery) {

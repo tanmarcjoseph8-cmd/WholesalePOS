@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
 import type { Actor } from "../auth/actor.js";
+import { listStockRows } from "../inventory/inventory.service.js";
 import type { ReportExportQuery, ReportQuery } from "./report.schemas.js";
 
 function toNumber(value: Prisma.Decimal | number | null | undefined) {
@@ -66,7 +67,7 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
     ...(actor.storeId ? { storeId: actor.storeId } : {})
   };
 
-  const [sales, inventory] = await prisma.$transaction([
+  const [sales, inventory] = await Promise.all([
     prisma.sale.findMany({
       where,
       include: {
@@ -80,14 +81,7 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
       },
       orderBy: { createdAt: "asc" }
     }),
-    prisma.inventoryStock.findMany({
-      where: actor.storeId ? { warehouse: { storeId: actor.storeId } } : {},
-      include: {
-        product: { select: { id: true, name: true, sku: true, costPrice: true, minimumStock: true, inventoryUnit: true } },
-        warehouse: { select: { id: true, name: true } }
-      },
-      orderBy: [{ product: { name: "asc" } }, { warehouse: { name: "asc" } }]
-    })
+    listStockRows({ storeId: actor.storeId ?? undefined })
   ]);
 
   let grossProfit = 0;
