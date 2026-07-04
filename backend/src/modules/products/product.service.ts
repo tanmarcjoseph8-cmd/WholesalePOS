@@ -12,7 +12,11 @@ import { findPriceChanges, type PriceFields } from "./product-pricing.js";
 const productInclude = {
   barcodes: true,
   category: { select: { id: true, name: true } },
-  supplier: { select: { id: true, name: true } }
+  supplier: { select: { id: true, name: true } },
+  stocks: {
+    include: { warehouse: { select: { id: true, name: true, code: true, storeId: true } } },
+    orderBy: [{ warehouse: { code: "asc" } }]
+  }
 } satisfies Prisma.ProductInclude;
 
 function normalizeBarcodes(barcodes: ProductCreateInput["barcodes"]) {
@@ -151,6 +155,20 @@ export async function createProduct(input: ProductCreateInput, actor: Actor) {
       include: productInclude
     });
 
+    const warehouses = await transaction.warehouse.findMany({
+      where: { deletedAt: null, storeId: actor.storeId ?? undefined },
+      select: { id: true }
+    });
+    if (warehouses.length) {
+      await transaction.inventoryStock.createMany({
+        data: warehouses.map((warehouse) => ({
+          productId: created.id,
+          warehouseId: warehouse.id,
+          quantity: 0
+        }))
+      });
+    }
+
     await transaction.auditLog.create({
       data: {
         actorId: actor.userId,
@@ -161,7 +179,10 @@ export async function createProduct(input: ProductCreateInput, actor: Actor) {
       }
     });
 
-    return created;
+    return transaction.product.findUniqueOrThrow({
+      where: { id: created.id },
+      include: productInclude
+    });
   });
 
   publishRealtimeEvent(realtimeEvents.productCreated, {

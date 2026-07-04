@@ -1,4 +1,4 @@
-import { Minus, Plus, Printer, ScanBarcode, Trash2, X } from "lucide-react";
+import { Minus, Plus, Printer, RefreshCw, ScanBarcode, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSale, fetchProducts, fetchSaleReceipt, fetchStock, fetchWarehouses, requestReceiptPrint, type Product } from "../lib/api";
@@ -56,6 +56,10 @@ function calculateLine(item: CartItem) {
   const unitPrice = packagePrice / packageSize;
   const subtotal = unitPrice * baseQuantity;
   return { baseQuantity, unitPrice, subtotal, total: Math.max(0, subtotal - item.discount) };
+}
+
+function productStockQuantity(product: Product) {
+  return product.stocks.reduce((sum, stock) => sum + stock.quantity, 0);
 }
 
 export function PosPage() {
@@ -168,6 +172,14 @@ export function PosPage() {
               <h2 className="text-2xl font-bold">Point of Sale</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Search, scan, add to cart, and checkout.</p>
             </div>
+            <button
+              className="focus-ring inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-bold dark:border-slate-700"
+              type="button"
+              onClick={() => void refreshStockAwareViews(queryClient)}
+            >
+              <RefreshCw size={16} />
+              Sync
+            </button>
           </div>
           <div className="relative mt-5">
             <ScanBarcode className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
@@ -203,7 +215,10 @@ export function PosPage() {
             </div>
           ) : null}
           {products.data?.items.map((product) => {
-            const availableStock = stockByProductId.get(product.id) ?? 0;
+            const liveStock = stockByProductId.get(product.id);
+            const fallbackStock = productStockQuantity(product);
+            const availableStock = liveStock ?? fallbackStock;
+            const isCheckingStock = stock.isLoading && liveStock === undefined && product.stocks.length === 0;
             return (
               <button
                 key={product.id}
@@ -216,7 +231,7 @@ export function PosPage() {
                   <span>
                     {formatCurrency(product.retailPrice)} / {product.packageSize} {unitLabel(product.inventoryUnit)}
                   </span>
-                  <span>{stock.isLoading ? "Checking stock" : `${availableStock.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unitLabel(product.inventoryUnit)} left`}</span>
+                  <span>{isCheckingStock ? "Checking stock" : `${availableStock.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unitLabel(product.inventoryUnit)} left`}</span>
                 </div>
               </button>
             );

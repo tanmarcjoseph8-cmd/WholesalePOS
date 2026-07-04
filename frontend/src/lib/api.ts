@@ -65,7 +65,18 @@ const productSchema = z.object({
   wholesaleThreshold: z.coerce.number(),
   minimumStock: z.coerce.number(),
   status: z.string(),
-  barcodes: z.array(z.object({ id: z.string(), value: z.string(), isPrimary: z.boolean() })).default([])
+  barcodes: z.array(z.object({ id: z.string(), value: z.string(), isPrimary: z.boolean() })).default([]),
+  stocks: z
+    .array(
+      z.object({
+        id: z.string(),
+        productId: z.string(),
+        warehouseId: z.string(),
+        quantity: z.coerce.number(),
+        warehouse: z.object({ id: z.string(), name: z.string(), code: z.string(), storeId: z.string() }).optional()
+      })
+    )
+    .default([])
 });
 
 const productListSchema = z.object({

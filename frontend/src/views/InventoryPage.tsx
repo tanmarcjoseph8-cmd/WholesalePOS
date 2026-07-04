@@ -1,4 +1,4 @@
-import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import type { FocusEvent } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -726,8 +726,16 @@ export function InventoryPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
             <h3 className="font-bold">Stock Balances</h3>
+            <button
+              className="focus-ring inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-xs font-bold dark:border-slate-700"
+              type="button"
+              onClick={() => void refreshStockAwareViews(queryClient)}
+            >
+              <RefreshCw size={14} />
+              Sync
+            </button>
           </div>
           <table className="w-full min-w-[620px] text-left text-sm">
             <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -739,7 +747,19 @@ export function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {stock.data?.items.length ? (
+              {stock.isLoading ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-slate-500 dark:text-slate-400" colSpan={4}>
+                    Loading stock balances...
+                  </td>
+                </tr>
+              ) : stock.error ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-rose" colSpan={4}>
+                    Stock balances could not load. Press Sync or restart the app.
+                  </td>
+                </tr>
+              ) : stock.data?.items.length ? (
                 stock.data.items.map((item) => {
                   const isLow = item.quantity <= item.product.minimumStock;
                   return (

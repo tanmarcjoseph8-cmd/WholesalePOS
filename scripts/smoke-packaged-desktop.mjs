@@ -268,6 +268,12 @@ try {
     throw new Error("Packaged warehouse smoke test failed.");
   }
 
+  const zeroStock = await requestJson(port, `/api/inventory/stock?productId=${noBarcodeProduct.id}`, { token: session.accessToken });
+  const zeroStockQuantity = zeroStock?.items?.[0]?.quantity;
+  if (!zeroStock?.items?.length || Math.abs(Number(zeroStockQuantity)) > 0.0001) {
+    throw new Error(`Zero-stock balance visibility failed. Expected No Barcode Product at 0, got ${zeroStockQuantity}.`);
+  }
+
   await requestJson(port, "/api/inventory/movements", {
     method: "POST",
     token: session.accessToken,
@@ -280,6 +286,12 @@ try {
       reason: "Packaged smoke stock"
     }
   });
+
+  const stocked = await requestJson(port, `/api/inventory/stock?productId=${product.id}`, { token: session.accessToken });
+  const stockedQuantity = stocked?.items?.[0]?.quantity;
+  if (Math.abs(Number(stockedQuantity) - 5) > 0.0001) {
+    throw new Error(`Stock balance update failed. Expected 5kg after stock in, got ${stockedQuantity}.`);
+  }
 
   const sale = await requestJson(port, "/api/sales", {
     method: "POST",
