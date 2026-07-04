@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardPage } from "../views/DashboardPage";
 import { PosPage } from "../views/PosPage";
 import { InventoryPage } from "../views/InventoryPage";
+import { ReportsPage } from "../views/ReportsPage";
 import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
 import { clearSession, fetchCurrentUser, fetchSetupStatus, loadSession, login, saveSession, setupOwner, type AuthSession } from "../lib/api";
@@ -13,6 +14,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: ChartNoAxesCombined },
   { to: "/pos", label: "POS", icon: ReceiptText, permission: "sales.manage" },
   { to: "/inventory", label: "Inventory", icon: Boxes, permission: "products.manage" },
+  { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, permission: "sales.manage" },
   { to: "/users", label: "Users", icon: Users, permission: "users.manage" }
 ];
 
@@ -211,6 +213,7 @@ export function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
             <Route path="/inventory" element={canManageProducts ? <InventoryPage /> : <DashboardPage />} />
+            <Route path="/reports" element={canUseSales ? <ReportsPage /> : <DashboardPage />} />
             <Route path="/users" element={canManageUsers ? <UsersPage /> : <DashboardPage />} />
           </Routes>
         </main>

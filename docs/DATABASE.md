@@ -59,3 +59,9 @@ Example: a 5kg rice sack priced at ₱300 has a package size of `5` and inventor
 Receipt numbers are generated from `ReceiptSequence` and saved on `Sale.receiptNumber`. The receipt module builds receipt text, HTML, barcode data, and ESC/POS command payloads directly from saved sale records so receipts can be regenerated later.
 
 Every print request inserts `ReceiptPrintLog` with the sale, user, printer type, printer name, paper width, status, and timestamp. This keeps a permanent record of receipt printing and reprinting without deleting historical sales.
+
+## Reports
+
+Reports are generated from saved operational tables rather than copied into separate summary tables. Sales reports use `Sale`, `SaleItem`, and `SalePayment`; profit reports combine sale revenue with `Product.costPrice` and package size; inventory reports use `InventoryStock` and product stock thresholds.
+
+This keeps daily, weekly, monthly, and exported reports recoverable from the same permanent business records.

@@ -273,6 +273,16 @@ try {
     throw new Error("Receipt print logging smoke test failed.");
   }
 
+  const report = await requestJson(port, "/api/reports/overview?period=daily", { token: session.accessToken });
+  if (report?.summary?.salesCount !== 1 || Math.abs(Number(report?.summary?.revenue) - 150) > 0.0001) {
+    throw new Error("Sales reporting smoke test failed.");
+  }
+
+  const excelExport = await requestJson(port, "/api/reports/export?period=daily&format=excel", { token: session.accessToken });
+  if (!excelExport?.content?.includes("Best Sellers") || !excelExport?.fileName?.endsWith(".csv")) {
+    throw new Error("Excel-compatible report export smoke test failed.");
+  }
+
   console.info("Packaged desktop smoke test passed.");
 } finally {
   await stopBackend(backendProcess);

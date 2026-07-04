@@ -126,6 +126,42 @@ const receiptSchema = z.object({
   printLogId: z.string().optional()
 });
 
+const reportOverviewSchema = z.object({
+  period: z.string(),
+  startDate: z.string(),
+  endDate: z.string(),
+  summary: z.object({
+    salesCount: z.number(),
+    revenue: z.number(),
+    grossProfit: z.number(),
+    averageSale: z.number(),
+    inventoryValue: z.number(),
+    lowStockCount: z.number()
+  }),
+  bestSellers: z.array(z.object({ id: z.string(), sku: z.string(), name: z.string(), quantity: z.number(), revenue: z.number(), profit: z.number() })),
+  cashierSales: z.array(z.object({ id: z.string(), name: z.string(), saleCount: z.number(), revenue: z.number() })),
+  paymentSummary: z.array(z.object({ id: z.string(), method: z.string(), count: z.number(), amount: z.number() })),
+  inventoryReport: z.array(
+    z.object({
+      productId: z.string(),
+      sku: z.string(),
+      name: z.string(),
+      warehouse: z.string(),
+      quantity: z.number(),
+      unit: z.string(),
+      value: z.number(),
+      alert: z.string()
+    })
+  )
+});
+
+const reportExportSchema = z.object({
+  format: z.enum(["pdf", "excel"]),
+  mimeType: z.string(),
+  fileName: z.string(),
+  content: z.string()
+});
+
 const paginatedStockSchema = z.object({
   items: z.array(inventoryStockSchema),
   pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
@@ -145,6 +181,8 @@ export type InventoryStock = z.infer<typeof inventoryStockSchema>;
 export type InventoryMovement = z.infer<typeof inventoryMovementSchema>;
 export type SaleSummary = z.infer<typeof saleSummarySchema>;
 export type ReceiptPreview = z.infer<typeof receiptSchema>;
+export type ReportOverview = z.infer<typeof reportOverviewSchema>;
+export type ReportPeriod = "daily" | "weekly" | "monthly" | "custom";
 
 export type ProductCreatePayload = {
   sku: string;
@@ -345,6 +383,20 @@ export async function requestReceiptPrint(input: {
       })
     })
   );
+}
+
+export async function fetchReportOverview(input: { period: ReportPeriod; startDate?: string; endDate?: string }) {
+  const query = new URLSearchParams({ period: input.period });
+  if (input.startDate) query.set("startDate", input.startDate);
+  if (input.endDate) query.set("endDate", input.endDate);
+  return reportOverviewSchema.parse(await apiRequest(`/api/reports/overview?${query.toString()}`));
+}
+
+export async function exportReport(input: { period: ReportPeriod; format: "pdf" | "excel"; startDate?: string; endDate?: string }) {
+  const query = new URLSearchParams({ period: input.period, format: input.format });
+  if (input.startDate) query.set("startDate", input.startDate);
+  if (input.endDate) query.set("endDate", input.endDate);
+  return reportExportSchema.parse(await apiRequest(`/api/reports/export?${query.toString()}`));
 }
 
 export async function createProduct(input: ProductCreatePayload) {

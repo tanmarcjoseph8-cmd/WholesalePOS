@@ -216,6 +216,18 @@ Response includes:
 }
 ```
 
+## Reports
+
+All report endpoints require `Authorization: Bearer <accessToken>` and the `sales.manage` permission.
+
+`GET /reports/overview?period=daily`
+
+Returns sales count, revenue, gross profit, average sale, inventory value, low-stock count, best sellers, cashier sales, payment summaries, and inventory report rows. Supported periods are `daily`, `weekly`, `monthly`, and `custom` with optional `startDate` and `endDate`.
+
+`GET /reports/export?period=daily&format=excel`
+
+Returns an export payload. `format=excel` returns Excel-compatible CSV content. `format=pdf` returns print-ready report HTML that can be saved as PDF from the Windows print dialog.
+
 `POST /receipts/sales/:saleId/print`
 
 Records a permanent receipt print request and returns the same print payload. `printerType` can be `WINDOWS` for the app print dialog or `ESC_POS` for thermal printer command output.
