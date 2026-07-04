@@ -68,7 +68,7 @@ export function PosPage() {
   const [receiptPaperWidth, setReceiptPaperWidth] = useState<"58mm" | "80mm">("80mm");
   const products = useQuery({ queryKey: ["pos-products", search], queryFn: () => fetchProducts(search) });
   const warehouses = useQuery({ queryKey: ["warehouses"], queryFn: fetchWarehouses });
-  const stock = useQuery({ queryKey: ["stock", search], queryFn: () => fetchStock(search) });
+  const stock = useQuery({ queryKey: ["stock", "pos-balances"], queryFn: () => fetchStock("") });
   const receipt = useQuery({
     queryKey: ["receipt", receiptSaleId, receiptPaperWidth],
     queryFn: () => fetchSaleReceipt({ saleId: receiptSaleId as string, paperWidth: receiptPaperWidth }),
@@ -78,6 +78,13 @@ export function PosPage() {
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + calculateLine(item).subtotal, 0), [cart]);
   const discountTotal = useMemo(() => cart.reduce((sum, item) => sum + item.discount, 0), [cart]);
+  const stockByProductId = useMemo(() => {
+    const quantities = new Map<string, number>();
+    for (const item of stock.data?.items ?? []) {
+      quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+    }
+    return quantities;
+  }, [stock.data?.items]);
   const total = Math.max(0, subtotal - discountTotal);
   const paid = cashAmount + gcashAmount;
   const change = Math.max(0, paid - total);
@@ -193,7 +200,7 @@ export function PosPage() {
             </div>
           ) : null}
           {products.data?.items.map((product) => {
-            const stockRow = stock.data?.items.find((item) => item.productId === product.id);
+            const availableStock = stockByProductId.get(product.id) ?? 0;
             return (
               <button
                 key={product.id}
@@ -206,7 +213,7 @@ export function PosPage() {
                   <span>
                     {formatCurrency(product.retailPrice)} / {product.packageSize} {unitLabel(product.inventoryUnit)}
                   </span>
-                  <span>{stockRow ? `${stockRow.quantity} ${unitLabel(product.inventoryUnit)} left` : "No stock"}</span>
+                  <span>{stock.isLoading ? "Checking stock" : `${availableStock.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${unitLabel(product.inventoryUnit)} left`}</span>
                 </div>
               </button>
             );

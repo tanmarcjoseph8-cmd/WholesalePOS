@@ -32,6 +32,25 @@ const navItems = [
   { to: "/users", label: "Users", icon: Users, permission: "users.manage" }
 ];
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  tone: string;
+};
+
+const dismissedNotificationsKey = "wholesalepos.dismissed-notifications";
+const readNotificationsKey = "wholesalepos.read-notifications";
+
+function loadNotificationIds(key: string) {
+  const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+  return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+}
+
+function saveNotificationIds(key: string, ids: string[]) {
+  window.localStorage.setItem(key, JSON.stringify(ids));
+}
+
 function AuthScreen({ onSession }: { onSession: (session: AuthSession) => void }) {
   const queryClient = useQueryClient();
   const setupStatus = useQuery({ queryKey: ["setup-status"], queryFn: fetchSetupStatus });
@@ -178,6 +197,8 @@ export function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
   const [inventoryUnlocked, setInventoryUnlocked] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => loadNotificationIds(dismissedNotificationsKey));
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => loadNotificationIds(readNotificationsKey));
   const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser, enabled: Boolean(session) });
   const health = useApiHealth();
   const notificationStock = useQuery({ queryKey: ["notifications", "low-stock"], queryFn: () => fetchStock("", true), enabled: Boolean(session) });
@@ -185,17 +206,26 @@ export function App() {
     if (health.isLoading) return "Checking";
     return health.data?.status === "ok" ? "Online" : "Offline";
   }, [health.data?.status, health.isLoading]);
-  const notifications = useMemo(() => {
-    const items: Array<{ title: string; body: string; tone: string }> = [];
-    const lowStockCount = notificationStock.data?.pagination.total ?? 0;
-    if (lowStockCount > 0) {
-      items.push({ title: "Inventory alert", body: `${lowStockCount} product${lowStockCount === 1 ? "" : "s"} low or out of stock.`, tone: "text-amber" });
+  const activeNotifications = useMemo(() => {
+    const items: NotificationItem[] = [];
+    for (const stock of notificationStock.data?.items ?? []) {
+      const isOut = stock.quantity <= 0;
+      items.push({
+        id: `stock-${stock.productId}-${stock.warehouseId}-${isOut ? "out" : "low"}`,
+        title: isOut ? "Out of stock" : "Low stock",
+        body: `${stock.product.name} has ${stock.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${stock.product.inventoryUnit.toLowerCase()} left in ${stock.warehouse.name}.`,
+        tone: isOut ? "text-rose" : "text-amber"
+      });
     }
     if (!health.isLoading && health.data?.status !== "ok") {
-      items.push({ title: "Connection alert", body: "The local backend is offline.", tone: "text-rose" });
+      items.push({ id: "connection-offline", title: "Connection alert", body: "The local backend is offline.", tone: "text-rose" });
     }
-    return items;
-  }, [health.data?.status, health.isLoading, notificationStock.data?.pagination.total]);
+    return items.filter((item) => !dismissedNotificationIds.includes(item.id));
+  }, [dismissedNotificationIds, health.data?.status, health.isLoading, notificationStock.data?.items]);
+  const unreadNotificationCount = useMemo(
+    () => activeNotifications.filter((notification) => !readNotificationIds.includes(notification.id)).length,
+    [activeNotifications, readNotificationIds]
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -205,6 +235,25 @@ export function App() {
     if (!session) return undefined;
     return connectRealtimeUpdates(queryClient);
   }, [queryClient, session]);
+
+  function openNotifications() {
+    setNotificationsOpen((value) => {
+      const nextOpen = !value;
+      if (nextOpen) {
+        const nextReadIds = Array.from(new Set([...readNotificationIds, ...activeNotifications.map((notification) => notification.id)]));
+        setReadNotificationIds(nextReadIds);
+        saveNotificationIds(readNotificationsKey, nextReadIds);
+      }
+      return nextOpen;
+    });
+  }
+
+  function clearNotifications() {
+    const nextDismissedIds = Array.from(new Set([...dismissedNotificationIds, ...activeNotifications.map((notification) => notification.id)]));
+    setDismissedNotificationIds(nextDismissedIds);
+    saveNotificationIds(dismissedNotificationsKey, nextDismissedIds);
+    setNotificationsOpen(false);
+  }
 
   if (!session) {
     return <AuthScreen onSession={setSession} />;
@@ -263,21 +312,27 @@ export function App() {
               <button
                 className="focus-ring relative grid h-11 w-11 place-items-center rounded-md border border-slate-200 dark:border-slate-700"
                 aria-label="Notifications"
-                onClick={() => setNotificationsOpen((value) => !value)}
+                onClick={openNotifications}
               >
                 <Bell size={19} />
-                {notifications.length ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose" /> : null}
+                {unreadNotificationCount ? <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose" /> : null}
               </button>
               {notificationsOpen ? (
                 <section className="absolute right-0 top-13 z-30 w-80 rounded-md border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-sm font-bold">Notifications</h2>
-                    <span className="text-xs text-slate-500">{notifications.length ? `${notifications.length} active` : "Clear"}</span>
+                    {activeNotifications.length ? (
+                      <button className="focus-ring rounded-md px-2 py-1 text-xs font-bold text-ocean" onClick={clearNotifications}>
+                        Clear
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">Clear</span>
+                    )}
                   </div>
                   <div className="mt-3 space-y-2">
-                    {notifications.length ? (
-                      notifications.map((notification) => (
-                        <article key={notification.title} className="rounded-md bg-slate-100 p-3 text-sm dark:bg-slate-800">
+                    {activeNotifications.length ? (
+                      activeNotifications.map((notification) => (
+                        <article key={notification.id} className="rounded-md bg-slate-100 p-3 text-sm dark:bg-slate-800">
                           <p className={`font-bold ${notification.tone}`}>{notification.title}</p>
                           <p className="mt-1 text-slate-600 dark:text-slate-300">{notification.body}</p>
                         </article>
