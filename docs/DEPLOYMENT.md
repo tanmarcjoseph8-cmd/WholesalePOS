@@ -12,6 +12,28 @@ WholesalePOS is currently structured for single-device local deployment. The nor
 - Restrict CORS to the local frontend origin for the desktop build.
 - Enable log collection for backend stdout.
 
+## Windows Package
+
+Create the verified zip package:
+
+```powershell
+pnpm desktop:package:win
+```
+
+Smoke-test the package before giving it to a user:
+
+```powershell
+pnpm desktop:smoke:win
+```
+
+Give the user this file:
+
+```text
+desktop\release\WholesalePOS-0.1.0-win.zip
+```
+
+The user extracts the zip and runs `WholesalePOS.exe`. The app creates its database, secret keys, logs, and backup folder under the user's application data folder.
+
 ## Desktop Troubleshooting
 
 If the Windows desktop app shows a startup error, check the startup log at `%APPDATA%\WholesalePOS\logs\desktop.log`. The log records database migration output and local backend startup output.

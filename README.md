@@ -4,14 +4,16 @@ WholesalePOS Enterprise is a production-grade wholesale and retail point-of-sale
 
 ## Current Milestone
 
-The current milestone makes the desktop app usable for first-run local inventory work:
+The app now supports a practical single-device POS workflow:
 
-- First-run owner account setup from the app window.
-- Secure login with locally persisted session state.
-- Product creation and searchable product list in Inventory.
-- Local SQLite persistence under the user's application data folder.
-- Packaged Windows desktop runtime with Prisma's standalone query engine.
-- Verification scripts and smoke-tested Windows zip packaging.
+- First-run owner setup, secure login, roles, and protected screens.
+- Product, inventory, stock adjustment, stock history, and low-stock controls.
+- POS checkout with barcode/search input, decimal quantities, cash, GCash, and mixed payments.
+- Variable quantity selling such as grams from kilogram stock or milliliters from liter stock.
+- Receipt preview, receipt barcode output, Windows print dialog support, ESC/POS payload generation, and print logs.
+- Daily, weekly, and monthly reports with sales, profit, inventory, best sellers, cashiers, payments, and exports.
+- Business, tax, receipt, printer, theme, manual backup, backup history, and managed restore settings.
+- Local SQLite persistence under the user's application data folder in the packaged app.
 
 ## Quick Start
 
@@ -36,15 +38,7 @@ The current milestone makes the desktop app usable for first-run local inventory
 
    The app stores day-to-day data in `database/wholesalepos.sqlite`.
 
-4. Bootstrap the owner account for local development:
-
-   ```powershell
-   $env:ADMIN_EMAIL="owner@example.com"
-   $env:ADMIN_PASSWORD="change-this-password"
-   pnpm --filter @wholesalepos/backend seed:admin
-   ```
-
-5. Start the application:
+4. Start the application:
 
    ```bash
    pnpm dev
@@ -52,6 +46,8 @@ The current milestone makes the desktop app usable for first-run local inventory
 
 Frontend: `http://localhost:5173`  
 Backend: `http://localhost:4000`
+
+On first run, create the owner account from the app screen.
 
 ## Desktop App
 
@@ -69,7 +65,7 @@ pnpm desktop:package:win
 
 The desktop app stores its day-to-day database under the user's application data folder, not in the Git repository.
 
-On a fresh desktop install, the app opens to an owner setup screen. Create the owner account there, then use Inventory to add products. Products are saved locally and remain after the app is closed.
+On a fresh desktop install, the app opens to an owner setup screen. Create the owner account there, then use Inventory, POS, Reports, and Settings. Products, sales, stock, receipts, settings, and backups are saved locally and remain after the app is closed.
 
 ## Verification
 
@@ -79,8 +75,8 @@ Run the full local verification suite:
 pnpm verify
 ```
 
-The milestone commit message for the current usable desktop milestone is:
+Smoke-test the packaged Windows app:
 
-```text
-feat(desktop): add first-run setup and product inventory
+```bash
+pnpm desktop:smoke:win
 ```

@@ -25,6 +25,28 @@ Use strong JWT secrets before running with real business data.
 
 The desktop shell starts the backend locally, runs migrations, opens the built frontend in an app window, and stores the live database under the user's application data folder.
 
+Build the downloadable Windows app:
+
+```powershell
+pnpm desktop:package:win
+```
+
+The verified package is created here:
+
+```text
+desktop\release\WholesalePOS-0.1.0-win.zip
+```
+
+To use it:
+
+1. Extract the zip.
+2. Open `WholesalePOS.exe` inside the extracted folder.
+3. Create the owner account on the first screen.
+4. Add products and stock in Inventory.
+5. Use POS for sales, Reports for summaries, and Settings for backups.
+
+For development, run:
+
 ```bash
 pnpm desktop:dev
 ```
@@ -41,7 +63,7 @@ Smoke-test the newest packaged Windows build:
 pnpm desktop:smoke:win
 ```
 
-The package output is written to `desktop/release/`. A separate NSIS installer command is available as `pnpm desktop:installer:win` for the later signed-installer milestone.
+The package output is written to `desktop/release/`. A separate NSIS installer command is available as `pnpm desktop:installer:win`.
 
 ## Bootstrap Owner Account
 
