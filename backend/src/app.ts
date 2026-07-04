@@ -16,6 +16,7 @@ import { productRouter } from "./modules/products/product.routes.js";
 import { receiptRouter } from "./modules/receipts/receipt.routes.js";
 import { reportRouter } from "./modules/reports/report.routes.js";
 import { saleRouter } from "./modules/sales/sale.routes.js";
+import { settingRouter } from "./modules/settings/setting.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
 
 export function createApp() {
@@ -38,6 +39,7 @@ export function createApp() {
   app.use("/api/receipts", receiptRouter);
   app.use("/api/reports", reportRouter);
   app.use("/api/sales", saleRouter);
+  app.use("/api/settings", settingRouter);
   app.use("/api/users", userRouter);
 
   if (env.FRONTEND_DIST_DIR && fs.existsSync(env.FRONTEND_DIST_DIR)) {

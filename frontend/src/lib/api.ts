@@ -162,6 +162,26 @@ const reportExportSchema = z.object({
   content: z.string()
 });
 
+const appSettingsSchema = z.object({
+  business: z.object({ name: z.string(), phone: z.string(), email: z.string(), address: z.string() }),
+  tax: z.object({ vatRate: z.number(), pricesIncludeVat: z.boolean() }),
+  receipt: z.object({ footer: z.string(), paperWidth: z.enum(["58mm", "80mm"]) }),
+  printer: z.object({ printerName: z.string(), printerType: z.enum(["WINDOWS", "ESC_POS"]) }),
+  theme: z.object({ mode: z.enum(["light", "dark", "system"]) }),
+  backup: z.object({ automaticBackupsEnabled: z.boolean(), retentionDays: z.number() })
+});
+
+const backupRunSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  filePath: z.string().nullable(),
+  fileSizeBytes: z.coerce.number().nullable(),
+  errorMessage: z.string().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable()
+});
+
 const paginatedStockSchema = z.object({
   items: z.array(inventoryStockSchema),
   pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
@@ -183,6 +203,8 @@ export type SaleSummary = z.infer<typeof saleSummarySchema>;
 export type ReceiptPreview = z.infer<typeof receiptSchema>;
 export type ReportOverview = z.infer<typeof reportOverviewSchema>;
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "custom";
+export type AppSettings = z.infer<typeof appSettingsSchema>;
+export type BackupRun = z.infer<typeof backupRunSchema>;
 
 export type ProductCreatePayload = {
   sku: string;
@@ -397,6 +419,36 @@ export async function exportReport(input: { period: ReportPeriod; format: "pdf" 
   if (input.startDate) query.set("startDate", input.startDate);
   if (input.endDate) query.set("endDate", input.endDate);
   return reportExportSchema.parse(await apiRequest(`/api/reports/export?${query.toString()}`));
+}
+
+export async function fetchSettings() {
+  return appSettingsSchema.parse(await apiRequest("/api/settings"));
+}
+
+export async function updateSettings(input: AppSettings) {
+  return appSettingsSchema.parse(
+    await apiRequest("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify(input)
+    })
+  );
+}
+
+export async function fetchBackups() {
+  return z.array(backupRunSchema).parse(await apiRequest("/api/settings/backups"));
+}
+
+export async function createBackup() {
+  return backupRunSchema.parse(await apiRequest("/api/settings/backups", { method: "POST" }));
+}
+
+export async function restoreBackup(backupRunId: string) {
+  return z.object({ restored: z.boolean(), requiresRestart: z.boolean(), safetyCopy: z.string() }).parse(
+    await apiRequest("/api/settings/restore", {
+      method: "POST",
+      body: JSON.stringify({ backupRunId })
+    })
+  );
 }
 
 export async function createProduct(input: ProductCreatePayload) {

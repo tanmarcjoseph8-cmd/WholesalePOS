@@ -283,6 +283,26 @@ try {
     throw new Error("Excel-compatible report export smoke test failed.");
   }
 
+  const settings = await requestJson(port, "/api/settings", { token: session.accessToken });
+  const updatedSettings = await requestJson(port, "/api/settings", {
+    method: "PUT",
+    token: session.accessToken,
+    body: {
+      ...settings,
+      business: { ...settings.business, name: "Smoke Store Updated" },
+      receipt: { ...settings.receipt, paperWidth: "80mm" }
+    }
+  });
+  if (updatedSettings?.business?.name !== "Smoke Store Updated") {
+    throw new Error("Settings update smoke test failed.");
+  }
+
+  const backup = await requestJson(port, "/api/settings/backups", { method: "POST", token: session.accessToken });
+  const backups = await requestJson(port, "/api/settings/backups", { token: session.accessToken });
+  if (backup?.status !== "COMPLETED" || !Array.isArray(backups) || !backups.some((item) => item.id === backup.id)) {
+    throw new Error("Backup smoke test failed.");
+  }
+
   console.info("Packaged desktop smoke test passed.");
 } finally {
   await stopBackend(backendProcess);

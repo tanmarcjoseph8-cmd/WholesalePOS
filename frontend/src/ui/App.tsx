@@ -1,4 +1,4 @@
-import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, Search, Sun, Users } from "lucide-react";
+import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, Search, Settings, Sun, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { DashboardPage } from "../views/DashboardPage";
 import { PosPage } from "../views/PosPage";
 import { InventoryPage } from "../views/InventoryPage";
 import { ReportsPage } from "../views/ReportsPage";
+import { SettingsPage } from "../views/SettingsPage";
 import { UsersPage } from "../views/UsersPage";
 import { useApiHealth } from "../lib/useApiHealth";
 import { clearSession, fetchCurrentUser, fetchSetupStatus, loadSession, login, saveSession, setupOwner, type AuthSession } from "../lib/api";
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/pos", label: "POS", icon: ReceiptText, permission: "sales.manage" },
   { to: "/inventory", label: "Inventory", icon: Boxes, permission: "products.manage" },
   { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, permission: "sales.manage" },
+  { to: "/settings", label: "Settings", icon: Settings, permission: "settings.manage" },
   { to: "/users", label: "Users", icon: Users, permission: "users.manage" }
 ];
 
@@ -140,6 +142,7 @@ export function App() {
   const canUseSales = permissions.includes("sales.manage");
   const canManageProducts = permissions.includes("products.manage");
   const canManageUsers = permissions.includes("users.manage");
+  const canManageSettings = permissions.includes("settings.manage");
 
   return (
     <div className="min-h-screen bg-slate-100 text-ink transition-colors dark:bg-slate-950 dark:text-white">
@@ -214,6 +217,7 @@ export function App() {
             <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
             <Route path="/inventory" element={canManageProducts ? <InventoryPage /> : <DashboardPage />} />
             <Route path="/reports" element={canUseSales ? <ReportsPage /> : <DashboardPage />} />
+            <Route path="/settings" element={canManageSettings ? <SettingsPage /> : <DashboardPage />} />
             <Route path="/users" element={canManageUsers ? <UsersPage /> : <DashboardPage />} />
           </Routes>
         </main>

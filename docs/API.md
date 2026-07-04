@@ -228,6 +228,30 @@ Returns sales count, revenue, gross profit, average sale, inventory value, low-s
 
 Returns an export payload. `format=excel` returns Excel-compatible CSV content. `format=pdf` returns print-ready report HTML that can be saved as PDF from the Windows print dialog.
 
+## Settings and Backups
+
+All settings endpoints require `Authorization: Bearer <accessToken>` and the `settings.manage` permission.
+
+`GET /settings`
+
+Returns business, tax, receipt, printer, theme, and backup settings with defaults applied.
+
+`PUT /settings`
+
+Updates settings groups and records an audit log.
+
+`GET /settings/backups`
+
+Lists recent local backup runs.
+
+`POST /settings/backups`
+
+Creates a manual copy of the local SQLite database in the managed backup folder and records a `BackupRun`.
+
+`POST /settings/restore`
+
+Restores a completed managed backup by ID, preserves a pre-restore safety copy, and returns `requiresRestart: true`.
+
 `POST /receipts/sales/:saleId/print`
 
 Records a permanent receipt print request and returns the same print payload. `printerType` can be `WINDOWS` for the app print dialog or `ESC_POS` for thermal printer command output.

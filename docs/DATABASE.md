@@ -65,3 +65,9 @@ Every print request inserts `ReceiptPrintLog` with the sale, user, printer type,
 Reports are generated from saved operational tables rather than copied into separate summary tables. Sales reports use `Sale`, `SaleItem`, and `SalePayment`; profit reports combine sale revenue with `Product.costPrice` and package size; inventory reports use `InventoryStock` and product stock thresholds.
 
 This keeps daily, weekly, monthly, and exported reports recoverable from the same permanent business records.
+
+## Settings and Backups
+
+Business, tax, receipt, printer, theme, and backup preferences are saved in `Setting` rows as JSON values scoped to the store.
+
+Manual backups copy the SQLite database file into the managed backup folder beside the live database and record the result in `BackupRun`. Restore uses an existing completed backup record, writes a pre-restore safety copy, replaces the live database file, audits the restore, and requires the app to be restarted so Prisma reconnects to the restored data.
