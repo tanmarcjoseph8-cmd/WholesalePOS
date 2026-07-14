@@ -32,7 +32,8 @@ export const settingsUpdateSchema = z.object({
       serviceChargeRate: z.coerce.number().min(0).max(1),
       splitBilling: z.boolean(),
       partialPayments: z.boolean(),
-      orderNumberFormat: z.string().trim().min(3).max(60)
+      orderNumberFormat: z.string().trim().min(3).max(60),
+      customOrderTypes: z.array(z.string().trim().min(1).max(60)).max(20).default([])
     })
     .optional()
 });

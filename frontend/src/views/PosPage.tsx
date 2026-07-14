@@ -87,7 +87,7 @@ export function PosPage() {
   const stockByProductId = useMemo(() => {
     const quantities = new Map<string, number>();
     for (const item of stock.data?.items ?? []) {
-      quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+      quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.availableQuantity);
     }
     return quantities;
   }, [stock.data?.items]);

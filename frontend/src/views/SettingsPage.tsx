@@ -180,6 +180,7 @@ export function SettingsPage() {
                   onChange={(event) => setForm({ ...form, restaurant: { ...form.restaurant, orderNumberFormat: event.target.value } })}
                 />
               </label>
+              <label className="text-sm font-semibold md:col-span-2">Custom order types<input className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800" placeholder="Curbside, Catering, Staff meal" value={form.restaurant.customOrderTypes.join(", ")} onChange={(event) => setForm({ ...form, restaurant: { ...form.restaurant, customOrderTypes: [...new Set(event.target.value.split(",").map((value) => value.trim()).filter(Boolean))].slice(0, 20) } })} /></label>
             </div>
           </section>
         ) : null}

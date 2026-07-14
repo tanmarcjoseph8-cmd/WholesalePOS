@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => {
     inventoryStock: {
       findMany: vi.fn()
     },
+    inventoryReservation: {
+      groupBy: vi.fn()
+    },
     inventoryMovement: {
       findMany: vi.fn(),
       count: vi.fn()
@@ -77,6 +80,7 @@ describe("inventory service compatibility", () => {
     mocks.prisma.product.findFirst.mockResolvedValue({ id: product.id, name: product.name });
     mocks.prisma.warehouse.findFirst.mockResolvedValue(warehouse);
     mocks.transaction.auditLog.create.mockResolvedValue({ id: "audit-1" });
+    mocks.prisma.inventoryReservation.groupBy.mockResolvedValue([]);
   });
 
   it("lists every active product and warehouse pair, including zero-stock rows", async () => {
@@ -93,6 +97,8 @@ describe("inventory service compatibility", () => {
           productId: product.id,
           warehouseId: warehouse.id,
           quantity: 0,
+          reservedQuantity: 0,
+          availableQuantity: 0,
           product,
           warehouse
         }

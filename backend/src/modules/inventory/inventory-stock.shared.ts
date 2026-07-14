@@ -18,6 +18,8 @@ export type StockBalanceRow = {
   productId: string;
   warehouseId: string;
   quantity: Prisma.Decimal | number;
+  reservedQuantity: Prisma.Decimal | number;
+  availableQuantity: Prisma.Decimal | number;
   product: {
     id: string;
     sku: string;

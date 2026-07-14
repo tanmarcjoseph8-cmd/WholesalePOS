@@ -8,6 +8,8 @@ const ownerPermissions = [
   "products.manage",
   "inventory.manage",
   "sales.manage",
+  "sales.refund",
+  "sales.void",
   "purchase-orders.manage",
   "customers.manage",
   "suppliers.manage",

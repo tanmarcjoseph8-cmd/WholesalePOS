@@ -30,6 +30,17 @@ Request:
 }
 ```
 
+## Restaurant Recovery and Reversals
+
+- `POST /restaurant/tables/:id/restore` restores a soft-deactivated table and requires `tables.manage`.
+- `POST /restaurant/orders/:id/undo` restores the latest reversible saved item edit and requires a reason.
+- `POST /restaurant/orders/:id/merge` merges a source active order into the target with both optimistic versions and requires `orders.split-bill`.
+- `POST /restaurant/orders/:id/split` moves selected sold-unit quantities into a new unpaid order and recalculates reservations.
+- `POST /sales/:id/refunds` creates a quantity-limited refund and linked `RETURN` movements. It requires `sales.refund`.
+- `POST /sales/:id/void` reverses the remaining completed sale and requires `sales.void`.
+
+Refund and void requests require a reason. An optional unique `requestKey` makes network retries idempotent. Repeating a completed full void returns the existing void without restoring inventory again.
+
 Response:
 
 ```json

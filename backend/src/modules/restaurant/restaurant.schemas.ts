@@ -8,11 +8,12 @@ export const restaurantTableStatusSchema = z.enum([
   "PREPARING",
   "SERVED",
   "AWAITING_PAYMENT",
-  "CLEANING"
+  "CLEANING",
+  "UNAVAILABLE"
 ]);
 
-export const restaurantOrderTypeSchema = z.enum(["DINE_IN", "WALK_IN", "COUNTER", "TAKEOUT", "PICKUP", "DELIVERY"]);
-export const restaurantOrderStatusSchema = z.enum(["DRAFT", "OPEN", "PREPARING", "READY", "SERVED", "PAID", "COMPLETED", "CANCELLED"]);
+export const restaurantOrderTypeSchema = z.enum(["DINE_IN", "WALK_IN", "COUNTER", "TAKEOUT", "PICKUP", "DELIVERY", "OTHER"]);
+export const restaurantOrderStatusSchema = z.enum(["DRAFT", "OPEN", "CONFIRMED", "PREPARING", "READY", "SERVED", "PAID", "COMPLETED", "CANCELLED"]);
 
 const unitTypeSchema = z.enum([
   "KILOGRAM",
@@ -62,8 +63,9 @@ export const restaurantOrderItemSchema = z.object({
   note: nullableText(500)
 });
 
-export const restaurantOrderCreateSchema = z.object({
+const restaurantOrderCreateBaseSchema = z.object({
   orderType: restaurantOrderTypeSchema.default("WALK_IN"),
+  customOrderType: nullableText(60),
   primaryTableId: z.string().trim().min(1).optional().nullable(),
   tableIds: z.array(z.string().trim().min(1)).max(20).default([]),
   customerId: z.string().trim().min(1).optional().nullable(),
@@ -77,8 +79,12 @@ export const restaurantOrderCreateSchema = z.object({
   items: z.array(restaurantOrderItemSchema).max(500).default([])
 });
 
-export const restaurantOrderUpdateSchema = restaurantOrderCreateSchema
-  .omit({ orderType: true, primaryTableId: true, tableIds: true })
+export const restaurantOrderCreateSchema = restaurantOrderCreateBaseSchema.superRefine((input, context) => {
+  if (input.orderType === "OTHER" && !input.customOrderType) context.addIssue({ code: z.ZodIssueCode.custom, path: ["customOrderType"], message: "Choose a custom order type." });
+});
+
+export const restaurantOrderUpdateSchema = restaurantOrderCreateBaseSchema
+  .omit({ orderType: true, customOrderType: true, primaryTableId: true, tableIds: true })
   .partial()
   .extend({
     expectedVersion: z.coerce.number().int().positive(),
@@ -115,6 +121,27 @@ export const restaurantOrderReopenSchema = z.object({
   expectedVersion: z.coerce.number().int().positive()
 });
 
+export const restaurantOrderUndoSchema = z.object({
+  expectedVersion: z.coerce.number().int().positive(),
+  reason: z.string().trim().min(3).max(500)
+});
+
+export const restaurantOrderMergeSchema = z.object({
+  expectedVersion: z.coerce.number().int().positive(),
+  sourceOrderId: z.string().trim().min(1),
+  sourceExpectedVersion: z.coerce.number().int().positive(),
+  reason: z.string().trim().min(3).max(500)
+});
+
+export const restaurantOrderSplitSchema = z.object({
+  expectedVersion: z.coerce.number().int().positive(),
+  items: z.array(z.object({ itemId: z.string().trim().min(1), quantity: z.coerce.number().finite().positive() })).min(1).max(500),
+  tableIds: z.array(z.string().trim().min(1)).max(20).default([]),
+  primaryTableId: z.string().trim().min(1).optional().nullable(),
+  customerName: nullableText(160),
+  reason: z.string().trim().min(3).max(500)
+});
+
 export const restaurantOrderCheckoutSchema = z.object({
   expectedVersion: z.coerce.number().int().positive(),
   serviceCharge: z.coerce.number().finite().min(0).max(999_999_999.99).optional(),
@@ -139,3 +166,6 @@ export type RestaurantOrderListQuery = z.infer<typeof restaurantOrderListQuerySc
 export type RestaurantOrderTableAssignmentInput = z.infer<typeof restaurantOrderTableAssignmentSchema>;
 export type RestaurantOrderCancelInput = z.infer<typeof restaurantOrderCancelSchema>;
 export type RestaurantOrderCheckoutInput = z.infer<typeof restaurantOrderCheckoutSchema>;
+export type RestaurantOrderUndoInput = z.infer<typeof restaurantOrderUndoSchema>;
+export type RestaurantOrderMergeInput = z.infer<typeof restaurantOrderMergeSchema>;
+export type RestaurantOrderSplitInput = z.infer<typeof restaurantOrderSplitSchema>;

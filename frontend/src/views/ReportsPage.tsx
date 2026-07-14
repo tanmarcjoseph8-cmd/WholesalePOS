@@ -162,7 +162,7 @@ export function ReportsPage() {
                 <td className="px-4 py-3 font-semibold">{item.name}</td>
                 <td className="px-4 py-3">{item.warehouse}</td>
                 <td className="px-4 py-3">
-                  {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} {item.unit.toLowerCase()}
+                  {(item.availableQuantity ?? item.quantity).toLocaleString(undefined, { maximumFractionDigits: 3 })} {item.unit.toLowerCase()} available{item.reservedQuantity ? ` (${item.reservedQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} reserved)` : ""}
                 </td>
                 <td className="px-4 py-3">{formatCurrency(item.value)}</td>
                 <td className="px-4 py-3">{item.alert}</td>

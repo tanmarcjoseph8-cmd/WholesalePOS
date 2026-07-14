@@ -109,3 +109,11 @@ This keeps daily, weekly, monthly, and exported reports recoverable from the sam
 Business, tax, receipt, printer, theme, and backup preferences are saved in `Setting` rows as JSON values scoped to the store.
 
 Manual backups copy the SQLite database file into the managed backup folder beside the live database and record the result in `BackupRun`. Restore uses an existing completed backup record, writes a pre-restore safety copy, replaces the live database file, audits the restore, and requires the app to be restarted so Prisma reconnects to the restored data.
+
+## Restaurant Reservations and Reversals
+
+`InventoryReservation` stores active, released, and consumed base-unit reservations for confirmed orders without changing physical stock. `HeldSale.mergedIntoOrderId` and `HeldSale.splitFromOrderId` preserve merge and split lineage.
+
+`SaleItem.warehouseId` preserves the inventory location needed for later reversals. `Refund.requestKey` protects retry idempotency. Each `RefundItem` links the original sale item, warehouse, restored sold/base quantities, and compensating inventory movement.
+
+Reservation recalculation, cancellation release, checkout consumption, order merge, and bill split run transactionally. Refund and void transactions increase stock only through linked `RETURN` movements and permanent audit records.

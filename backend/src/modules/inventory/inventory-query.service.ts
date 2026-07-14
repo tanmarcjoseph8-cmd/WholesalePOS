@@ -50,34 +50,51 @@ export async function listStockRows(query: StockBalanceQuery = {}) {
     return [];
   }
 
-  const stockRows = await prisma.inventoryStock.findMany({
-    where: {
-      productId: { in: products.map((product) => product.id) },
-      warehouseId: { in: warehouses.map((warehouse) => warehouse.id) }
-    },
-    include: stockInclude
-  });
+  const [stockRows, reservations] = await Promise.all([
+    prisma.inventoryStock.findMany({
+      where: {
+        productId: { in: products.map((product) => product.id) },
+        warehouseId: { in: warehouses.map((warehouse) => warehouse.id) }
+      },
+      include: stockInclude
+    }),
+    prisma.inventoryReservation.groupBy({
+      by: ["productId", "warehouseId"],
+      where: {
+        status: "ACTIVE",
+        productId: { in: products.map((product) => product.id) },
+        warehouseId: { in: warehouses.map((warehouse) => warehouse.id) }
+      },
+      _sum: { quantity: true }
+    })
+  ]);
   const stockByProductWarehouse = new Map(stockRows.map((row) => [`${row.productId}:${row.warehouseId}`, row]));
+  const reservedByProductWarehouse = new Map(reservations.map((row) => [`${row.productId}:${row.warehouseId}`, toNumber(row._sum.quantity ?? 0)]));
   const rows: StockBalanceRow[] = [];
 
   for (const product of products) {
     for (const warehouse of warehouses) {
       const existingStock = stockByProductWarehouse.get(`${product.id}:${warehouse.id}`);
+      const reservedQuantity = reservedByProductWarehouse.get(`${product.id}:${warehouse.id}`) ?? 0;
       rows.push(
-        existingStock ?? {
-          id: `zero-${product.id}-${warehouse.id}`,
-          productId: product.id,
-          warehouseId: warehouse.id,
-          quantity: 0,
-          product,
-          warehouse
-        }
+        existingStock
+          ? { ...existingStock, reservedQuantity, availableQuantity: Math.max(0, toNumber(existingStock.quantity) - reservedQuantity) }
+          : {
+              id: `zero-${product.id}-${warehouse.id}`,
+              productId: product.id,
+              warehouseId: warehouse.id,
+              quantity: 0,
+              reservedQuantity,
+              availableQuantity: 0,
+              product,
+              warehouse
+            }
       );
     }
   }
 
   const visibleRows = query.lowStockOnly
-    ? rows.filter((row) => toNumber(row.quantity) <= toNumber(row.product.minimumStock))
+    ? rows.filter((row) => toNumber(row.availableQuantity) <= toNumber(row.product.minimumStock))
     : rows;
 
   return visibleRows.sort((left, right) => {

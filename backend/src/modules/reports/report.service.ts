@@ -61,7 +61,7 @@ function upsertAggregate<T extends { id: string }>(items: T[], id: string, facto
 export async function getReportOverview(query: ReportQuery, actor: Actor) {
   const { start, end } = rangeFor(query);
   const where = {
-    status: "COMPLETED",
+    status: { in: ["COMPLETED", "PARTIALLY_REFUNDED"] },
     deletedAt: null,
     createdAt: { gte: start, lte: end },
     ...(actor.storeId ? { storeId: actor.storeId } : {})
@@ -77,7 +77,8 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
             product: { select: { id: true, name: true, sku: true, costPrice: true, packageSize: true } }
           }
         },
-        payments: true
+        payments: true,
+        refunds: { where: { status: "COMPLETED", deletedAt: null }, include: { items: true, payments: true } }
       },
       orderBy: { createdAt: "asc" }
     }),
@@ -90,14 +91,18 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
   const paymentSummary: Array<{ id: string; method: string; count: number; amount: number }> = [];
 
   for (const sale of sales) {
+    const refundedTotal = sale.refunds.reduce((sum, refund) => sum + toNumber(refund.grandTotal), 0);
     const cashier = upsertAggregate(cashierSales, sale.cashier.id, () => ({ id: sale.cashier.id, name: sale.cashier.name, saleCount: 0, revenue: 0 }));
     cashier.saleCount += 1;
-    cashier.revenue += toNumber(sale.grandTotal);
+    cashier.revenue += toNumber(sale.grandTotal) - refundedTotal;
 
     for (const item of sale.items) {
       const packageSize = Math.max(toNumber(item.product.packageSize), 0.001);
-      const cost = (toNumber(item.product.costPrice) / packageSize) * toNumber(item.baseQuantity);
-      const profit = toNumber(item.lineTotal) - cost;
+      const refundedItems = sale.refunds.flatMap((refund) => refund.items).filter((refundItem) => refundItem.saleItemId === item.id);
+      const netBaseQuantity = Math.max(0, toNumber(item.baseQuantity) - refundedItems.reduce((sum, refundItem) => sum + toNumber(refundItem.baseQuantity), 0));
+      const netLineTotal = Math.max(0, toNumber(item.lineTotal) - refundedItems.reduce((sum, refundItem) => sum + toNumber(refundItem.lineTotal), 0));
+      const cost = (toNumber(item.product.costPrice) / packageSize) * netBaseQuantity;
+      const profit = netLineTotal - cost;
       grossProfit += profit;
       const product = upsertAggregate(bestSellers, item.product.id, () => ({
         id: item.product.id,
@@ -107,8 +112,8 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
         revenue: 0,
         profit: 0
       }));
-      product.quantity += toNumber(item.baseQuantity);
-      product.revenue += toNumber(item.lineTotal);
+      product.quantity += netBaseQuantity;
+      product.revenue += netLineTotal;
       product.profit += profit;
     }
 
@@ -117,23 +122,32 @@ export async function getReportOverview(query: ReportQuery, actor: Actor) {
       summary.count += 1;
       summary.amount += toNumber(payment.amount);
     }
+    for (const payment of sale.refunds.flatMap((refund) => refund.payments)) {
+      const summary = upsertAggregate(paymentSummary, payment.method, () => ({ id: payment.method, method: payment.method, count: 0, amount: 0 }));
+      summary.amount -= toNumber(payment.amount);
+    }
   }
 
   const inventoryReport = inventory.map((stock) => {
-    const quantity = toNumber(stock.quantity);
+    const physicalQuantity = toNumber(stock.quantity);
+    const reservedQuantity = toNumber(stock.reservedQuantity);
+    const availableQuantity = toNumber(stock.availableQuantity);
     return {
       productId: stock.productId,
       sku: stock.product.sku,
       name: stock.product.name,
       warehouse: stock.warehouse.name,
-      quantity,
+      quantity: availableQuantity,
+      physicalQuantity,
+      reservedQuantity,
+      availableQuantity,
       unit: stock.product.inventoryUnit,
-      value: quantity * toNumber(stock.product.costPrice),
-      alert: quantity <= toNumber(stock.product.minimumStock) ? (quantity <= 0 ? "Out of stock" : "Low stock") : "OK"
+      value: physicalQuantity * toNumber(stock.product.costPrice),
+      alert: availableQuantity <= toNumber(stock.product.minimumStock) ? (availableQuantity <= 0 ? "Out of stock" : "Low stock") : "OK"
     };
   });
 
-  const revenue = sales.reduce((sum, sale) => sum + toNumber(sale.grandTotal), 0);
+  const revenue = sales.reduce((sum, sale) => sum + toNumber(sale.grandTotal) - sale.refunds.reduce((refundSum, refund) => refundSum + toNumber(refund.grandTotal), 0), 0);
 
   return {
     period: query.period,
@@ -181,8 +195,8 @@ function buildCsv(report: Awaited<ReturnType<typeof getReportOverview>>) {
     ...report.paymentSummary.map((item) => [item.method, item.count, item.amount]),
     [],
     ["Inventory"],
-    ["SKU", "Product", "Warehouse", "Quantity", "Unit", "Value", "Alert"],
-    ...report.inventoryReport.map((item) => [item.sku, item.name, item.warehouse, item.quantity, item.unit, item.value, item.alert])
+    ["SKU", "Product", "Warehouse", "Available", "Reserved", "Physical", "Unit", "Value", "Alert"],
+    ...report.inventoryReport.map((item) => [item.sku, item.name, item.warehouse, item.availableQuantity, item.reservedQuantity, item.physicalQuantity, item.unit, item.value, item.alert])
   ];
 
   return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");

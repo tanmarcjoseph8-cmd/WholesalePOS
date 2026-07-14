@@ -14,6 +14,8 @@ const roleDefinitions: Record<UserRoleInput, { name: string; description: string
       "products.manage",
       "inventory.manage",
       "sales.manage",
+      "sales.refund",
+      "sales.void",
       "customers.manage",
       "suppliers.manage",
       "reports.read",

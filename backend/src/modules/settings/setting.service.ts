@@ -25,7 +25,8 @@ const defaults = {
     serviceChargeRate: 0,
     splitBilling: false,
     partialPayments: false,
-    orderNumberFormat: "{TYPE}-{NUMBER}"
+    orderNumberFormat: "{TYPE}-{NUMBER}",
+    customOrderTypes: [] as string[]
   }
 };
 

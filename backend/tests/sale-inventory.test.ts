@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
     receiptSequence: { upsert: vi.fn() },
     product: { findFirst: vi.fn() },
     inventoryStock: { upsert: vi.fn(), update: vi.fn() },
+    inventoryReservation: { aggregate: vi.fn(), updateMany: vi.fn() },
     sale: { create: vi.fn() },
     heldSale: { findFirst: vi.fn(), updateMany: vi.fn() },
     restaurantTable: { updateMany: vi.fn() },
@@ -57,6 +58,8 @@ describe("sale inventory integration", () => {
       taxRate: 0
     });
     mocks.transaction.inventoryStock.upsert.mockResolvedValue({ id: "stock-1", quantity: 5 });
+    mocks.transaction.inventoryReservation.aggregate.mockResolvedValue({ _sum: { quantity: 0 } });
+    mocks.transaction.inventoryReservation.updateMany.mockResolvedValue({ count: 0 });
     mocks.transaction.sale.create.mockResolvedValue({
       id: "sale-1",
       receiptNumber: "POS-000001",
@@ -175,6 +178,10 @@ describe("sale inventory integration", () => {
     expect(mocks.transaction.inventoryMovement.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ type: "SALE", quantity: -2, referenceId: "sale-1" }) })
     );
+    expect(mocks.transaction.inventoryReservation.updateMany).toHaveBeenCalledWith({
+      where: { heldSaleId: "order-1", status: "ACTIVE" },
+      data: { status: "CONSUMED", consumedAt: expect.any(Date), reason: "Consumed by completed sale" }
+    });
   });
 
   it("rejects checkout when the held order version is stale before creating a sale", async () => {

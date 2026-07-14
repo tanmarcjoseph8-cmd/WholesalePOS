@@ -497,11 +497,96 @@ try {
     body: {
       ...settings,
       business: { ...settings.business, name: "Smoke Store Updated" },
-      receipt: { ...settings.receipt, paperWidth: "80mm" }
+      receipt: { ...settings.receipt, paperWidth: "80mm" },
+      businessMode: { ...settings.businessMode, mode: "HYBRID" },
+      restaurant: { ...settings.restaurant, customOrderTypes: ["Curbside"] }
     }
   });
-  if (updatedSettings?.business?.name !== "Smoke Store Updated") {
+  if (updatedSettings?.business?.name !== "Smoke Store Updated" || updatedSettings?.businessMode?.mode !== "HYBRID") {
     throw new Error("Settings update smoke test failed.");
+  }
+  const customOrder = await requestJson(port, "/api/restaurant/orders", {
+    method: "POST",
+    token: session.accessToken,
+    body: { orderType: "OTHER", customOrderType: "Curbside", guestCount: 1, items: [] }
+  });
+  if (customOrder?.customOrderType !== "Curbside") throw new Error("Configurable order type smoke test failed.");
+  await requestJson(port, `/api/restaurant/orders/${customOrder.id}/cancel`, {
+    method: "POST",
+    token: session.accessToken,
+    body: { expectedVersion: customOrder.version, reason: "Smoke cleanup" }
+  });
+
+  await requestJson(port, "/api/inventory/movements", {
+    method: "POST",
+    token: session.accessToken,
+    body: { productId: noBarcodeProduct.id, warehouseId, type: "STOCK_IN", quantity: 10, unitCost: 8, reason: "Restaurant integration smoke stock" }
+  });
+  const table = await requestJson(port, "/api/restaurant/tables", {
+    method: "POST",
+    token: session.accessToken,
+    body: { number: "R1", section: "Main", capacity: 4 }
+  });
+  const restaurantOrder = await requestJson(port, "/api/restaurant/orders", {
+    method: "POST",
+    token: session.accessToken,
+    body: {
+      orderType: "DINE_IN",
+      primaryTableId: table.id,
+      tableIds: [table.id],
+      guestCount: 2,
+      items: [{ productId: noBarcodeProduct.id, warehouseId, quantity: 2, soldUnit: "PIECE", discount: 0 }]
+    }
+  });
+  const confirmedOrder = await requestJson(port, `/api/restaurant/orders/${restaurantOrder.id}`, {
+    method: "PATCH",
+    token: session.accessToken,
+    body: { expectedVersion: restaurantOrder.version, status: "CONFIRMED" }
+  });
+  const reservedStock = await requestJson(port, `/api/inventory/stock?productId=${noBarcodeProduct.id}`, { token: session.accessToken });
+  if (Number(reservedStock?.items?.[0]?.quantity) !== 10 || Number(reservedStock?.items?.[0]?.reservedQuantity) !== 2 || Number(reservedStock?.items?.[0]?.availableQuantity) !== 8) {
+    throw new Error("Restaurant reservation visibility smoke test failed.");
+  }
+  const restaurantSale = await requestJson(port, `/api/restaurant/orders/${restaurantOrder.id}/checkout`, {
+    method: "POST",
+    token: session.accessToken,
+    body: { expectedVersion: confirmedOrder.version, payments: [{ method: "CASH", amount: 24 }] }
+  });
+  const consumedStock = await requestJson(port, `/api/inventory/stock?productId=${noBarcodeProduct.id}`, { token: session.accessToken });
+  if (Number(consumedStock?.items?.[0]?.quantity) !== 8 || Number(consumedStock?.items?.[0]?.reservedQuantity) !== 0 || Number(consumedStock?.items?.[0]?.availableQuantity) !== 8) {
+    throw new Error("Restaurant checkout reservation consumption smoke test failed.");
+  }
+
+  const refundRequest = {
+    requestKey: "packaged-smoke-refund-1",
+    reason: "Packaged smoke partial return",
+    items: [{ saleItemId: restaurantSale.items[0].id, quantity: 1 }]
+  };
+  const restaurantRefund = await requestJson(port, `/api/sales/${restaurantSale.id}/refunds`, { method: "POST", token: session.accessToken, body: refundRequest });
+  await requestJson(port, `/api/sales/${restaurantSale.id}/refunds`, { method: "POST", token: session.accessToken, body: refundRequest });
+  const refundedStock = await requestJson(port, `/api/inventory/stock?productId=${noBarcodeProduct.id}`, { token: session.accessToken });
+  if (restaurantRefund?.kind !== "REFUND" || Number(refundedStock?.items?.[0]?.quantity) !== 9) {
+    throw new Error("Partial refund or duplicate-request protection smoke test failed.");
+  }
+  const restaurantVoid = await requestJson(port, `/api/sales/${restaurantSale.id}/void`, {
+    method: "POST",
+    token: session.accessToken,
+    body: { requestKey: "packaged-smoke-void-1", reason: "Packaged smoke void remainder" }
+  });
+  await requestJson(port, `/api/sales/${restaurantSale.id}/void`, {
+    method: "POST",
+    token: session.accessToken,
+    body: { requestKey: "packaged-smoke-void-duplicate", reason: "Duplicate void must be idempotent" }
+  });
+  const voidedStock = await requestJson(port, `/api/inventory/stock?productId=${noBarcodeProduct.id}`, { token: session.accessToken });
+  if (restaurantVoid?.kind !== "VOID" || Number(voidedStock?.items?.[0]?.quantity) !== 10) {
+    throw new Error("Full void or duplicate-restoration protection smoke test failed.");
+  }
+
+  const disabledTable = await requestJson(port, `/api/restaurant/tables/${table.id}`, { method: "DELETE", token: session.accessToken });
+  const restoredTable = await requestJson(port, `/api/restaurant/tables/${table.id}/restore`, { method: "POST", token: session.accessToken });
+  if (disabledTable?.isActive !== false || restoredTable?.isActive !== true) {
+    throw new Error("Restaurant table deactivate/restore smoke test failed.");
   }
 
   const backup = await requestJson(port, "/api/settings/backups", { method: "POST", token: session.accessToken });

@@ -5,7 +5,7 @@
 1. Sign in as the owner or an administrator.
 2. Open Settings and choose `Restaurant` or `Hybrid` business mode.
 3. Enable the required table, walk-in, takeout, and delivery options, then save.
-4. Mark menu products as `Restaurant` or `Both` in Inventory.
+4. Confirm that the products are active in the existing POS catalog.
 5. Open Restaurant from the navigation.
 
 Retail mode remains unchanged. The Restaurant navigation and API operations are unavailable while the business mode is Retail.
@@ -22,7 +22,29 @@ Use New order for walk-in, counter, takeout, pickup, or delivery service. Dine-i
 
 Open an order to acquire its edit lease. Another employee cannot edit it until the current employee selects Hold, completes the order, or the two-minute lease expires. Every save uses an optimistic version; when another session changed the order, reload before editing again.
 
-Restaurant products can be searched and added to the order. Quantity uses the product selling unit and supports the same weight, volume, length, and count conversions as Retail POS. Item notes are saved with each active line. Status progresses from Draft or Open through Preparing, Ready, and Served.
+Every active POS product can be searched and added to the order. Quantity uses the product selling unit and supports the same weight, volume, length, and count conversions as Retail POS. Item notes are saved with each active line. Status progresses from Draft or Open through Confirmed, Preparing, Ready, and Served.
+
+## Shared Catalog and Reservations
+
+Restaurant orders use the same `Product`, barcode, warehouse, and inventory records as Retail POS. Draft and Open orders do not change physical stock. Confirming an order reserves its base-unit quantities. Inventory screens show physical, reserved, and available quantities.
+
+Preparing, Ready, and Served orders retain their reservations. Cancellation or returning a Confirmed order to Open releases them. Checkout consumes reservations while the normal sale transaction deducts physical stock. Other active reservations are excluded from Retail and Restaurant availability checks.
+
+## Recovery Operations
+
+- Undo last item change restores the most recent saved removal or quantity edit and records the reason.
+- Move / join tables transfers the active order while preserving its history.
+- Merge orders moves items, tables, charges, and reservations into one target order. The source remains linked in history.
+- Split bill moves selected quantities into a new unpaid order and proportionally divides charges and reservations.
+- Deactivate table removes an unused table from the live layout. Inactive tables can be shown and restored.
+
+All commands require the latest order version. A stale screen receives a conflict rather than overwriting newer work.
+
+## Refunds and Voids
+
+Authorized managers can refund selected sold quantities or void the remaining completed sale. A reason is mandatory. The original sale and payment records remain; the app creates a permanent refund, refund payments, refund items, and compensating `RETURN` inventory movements.
+
+Refund quantities cannot exceed the remaining sold quantities. Request keys and sale status checks prevent duplicate stock restoration.
 
 ## Payment and Inventory
 

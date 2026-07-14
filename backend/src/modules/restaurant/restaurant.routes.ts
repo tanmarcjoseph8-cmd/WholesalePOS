@@ -8,8 +8,11 @@ import {
   restaurantOrderCreateSchema,
   restaurantOrderListQuerySchema,
   restaurantOrderLockSchema,
+  restaurantOrderMergeSchema,
   restaurantOrderReopenSchema,
+  restaurantOrderSplitSchema,
   restaurantOrderTableAssignmentSchema,
+  restaurantOrderUndoSchema,
   restaurantOrderUpdateSchema,
   restaurantTableCreateSchema,
   restaurantTableListQuerySchema,
@@ -26,8 +29,12 @@ import {
   getRestaurantOrder,
   listRestaurantOrders,
   listRestaurantTables,
+  mergeRestaurantOrders,
   releaseRestaurantOrderLock,
   reopenRestaurantOrder,
+  restoreRestaurantTable,
+  splitRestaurantOrder,
+  undoRestaurantOrderItemChange,
   updateRestaurantOrder,
   updateRestaurantTable
 } from "./restaurant.service.js";
@@ -71,6 +78,14 @@ restaurantRouter.delete(
   requirePermission("tables.manage"),
   asyncHandler(async (request, response) => {
     response.json(await disableRestaurantTable(routeId(request.params.id), getActor(request)));
+  })
+);
+
+restaurantRouter.post(
+  "/tables/:id/restore",
+  requirePermission("tables.manage"),
+  asyncHandler(async (request, response) => {
+    response.json(await restoreRestaurantTable(routeId(request.params.id), getActor(request)));
   })
 );
 
@@ -145,6 +160,30 @@ restaurantRouter.post(
   asyncHandler(async (request, response) => {
     const input = restaurantOrderReopenSchema.parse(request.body);
     response.json(await reopenRestaurantOrder(routeId(request.params.id), input.expectedVersion, getActor(request)));
+  })
+);
+
+restaurantRouter.post(
+  "/orders/:id/undo",
+  requirePermission("orders.manage"),
+  asyncHandler(async (request, response) => {
+    response.json(await undoRestaurantOrderItemChange(routeId(request.params.id), restaurantOrderUndoSchema.parse(request.body), getActor(request)));
+  })
+);
+
+restaurantRouter.post(
+  "/orders/:id/merge",
+  requirePermission("orders.split-bill"),
+  asyncHandler(async (request, response) => {
+    response.json(await mergeRestaurantOrders(routeId(request.params.id), restaurantOrderMergeSchema.parse(request.body), getActor(request)));
+  })
+);
+
+restaurantRouter.post(
+  "/orders/:id/split",
+  requirePermission("orders.split-bill"),
+  asyncHandler(async (request, response) => {
+    response.status(201).json(await splitRestaurantOrder(routeId(request.params.id), restaurantOrderSplitSchema.parse(request.body), getActor(request)));
   })
 );
 

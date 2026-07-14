@@ -109,14 +109,14 @@ export function InventoryPage() {
   const reorderRows = useMemo(
     () =>
       (stock.data?.items ?? [])
-        .filter((item) => item.product.minimumStock > 0 && item.quantity <= item.product.minimumStock)
+        .filter((item) => item.product.minimumStock > 0 && item.availableQuantity <= item.product.minimumStock)
         .map((item) => ({
           ...item,
-          suggestedOrder: Math.max(item.product.minimumStock * 2 - item.quantity, 0)
+          suggestedOrder: Math.max(item.product.minimumStock * 2 - item.availableQuantity, 0)
         }))
         .sort((first, second) => {
-          const firstRatio = first.quantity / Math.max(first.product.minimumStock, 0.001);
-          const secondRatio = second.quantity / Math.max(second.product.minimumStock, 0.001);
+          const firstRatio = first.availableQuantity / Math.max(first.product.minimumStock, 0.001);
+          const secondRatio = second.availableQuantity / Math.max(second.product.minimumStock, 0.001);
           return firstRatio - secondRatio || first.product.name.localeCompare(second.product.name);
         }),
     [stock.data?.items]
@@ -873,15 +873,15 @@ export function InventoryPage() {
                 </tr>
               ) : stock.data?.items.length ? (
                 stock.data.items.map((item) => {
-                  const isLow = item.quantity <= item.product.minimumStock;
+                  const isLow = item.availableQuantity <= item.product.minimumStock;
                   return (
                     <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
                       <td className="px-4 py-3 font-semibold">{item.product.name}</td>
                       <td className="px-4 py-3">{item.warehouse.name}</td>
                       <td className="px-4 py-3">
-                        {item.quantity} {item.product.inventoryUnit.toLowerCase()}
+                        {item.availableQuantity} available ({item.quantity} physical, {item.reservedQuantity} reserved) {item.product.inventoryUnit.toLowerCase()}
                       </td>
-                      <td className="px-4 py-3">{isLow ? (item.quantity <= 0 ? "Out of stock" : "Low stock") : "OK"}</td>
+                      <td className="px-4 py-3">{isLow ? (item.availableQuantity <= 0 ? "Out of stock" : "Low stock") : "OK"}</td>
                     </tr>
                   );
                 })

@@ -7,7 +7,7 @@ export function DashboardPage() {
   const stock = useQuery({ queryKey: ["stock", "dashboard"], queryFn: () => fetchStock("") });
   const lowStock = useQuery({ queryKey: ["stock", "low"], queryFn: () => fetchStock("", true) });
   const summary = report.data?.summary;
-  const totalAvailableStock = stock.data?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const totalAvailableStock = stock.data?.items.reduce((sum, item) => sum + item.availableQuantity, 0) ?? 0;
   const metrics = [
     { label: "Today's Sales", value: formatCurrency(summary?.revenue ?? 0), tone: "bg-ocean" },
     { label: "Inventory Value", value: formatCurrency(summary?.inventoryValue ?? 0), tone: "bg-mint" },
@@ -47,7 +47,7 @@ export function DashboardPage() {
             {lowStock.data?.items.length ? (
               lowStock.data.items.slice(0, 5).map((item) => (
                 <p key={item.id} className="rounded-md bg-amber/10 p-3 font-semibold text-amber">
-                  {item.product.name}: {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} {item.product.inventoryUnit.toLowerCase()} left.
+                  {item.product.name}: {item.availableQuantity.toLocaleString(undefined, { maximumFractionDigits: 3 })} {item.product.inventoryUnit.toLowerCase()} available.
                 </p>
               ))
             ) : (

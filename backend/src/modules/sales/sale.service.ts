@@ -7,6 +7,7 @@ import { buildPaginatedResponse, getPagination } from "../../shared/pagination.j
 import type { Actor } from "../auth/actor.js";
 import { calculateNextStock } from "../inventory/inventory-calculations.js";
 import { calculateVariableSaleLine, type UnitCode } from "../inventory/unit-conversion.js";
+import { consumeOrderReservations, quantityReservedByOtherOrders } from "../restaurant/order-reservation.service.js";
 import type { SaleCreateInput, SaleListQuery } from "./sale.schemas.js";
 import { nextSequenceNumber } from "./numbering.service.js";
 
@@ -71,6 +72,7 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
         customerId: order.customerId,
         orderNumber: order.orderNumber,
         orderType: order.orderType as SaleCreateInput["orderType"],
+        customOrderType: order.customOrderType,
         serviceCharge: heldSale.checkout.serviceCharge ?? toNumber(order.serviceCharge),
         tip: heldSale.checkout.tip ?? toNumber(order.tip),
         items: order.items.map((item) => ({
@@ -136,6 +138,8 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
         soldUnit,
         inventoryUnit: baseUnit
       });
+      const reservedByOtherOrders = await quantityReservedByOtherOrders(transaction, item.productId, item.warehouseId, heldSale?.id);
+      calculateNextStock(toNumber(stock.quantity) - reservedByOtherOrders, saleLine.baseQuantity, "DECREASE");
       const nextQuantity = calculateNextStock(toNumber(stock.quantity), saleLine.baseQuantity, "DECREASE");
       const unitPrice = item.unitPrice ?? saleLine.unitPrice;
       const gross = roundMoney(unitPrice * saleLine.baseQuantity);
@@ -166,6 +170,7 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
         receiptNumber,
         orderNumber: checkoutInput.orderNumber ?? undefined,
         orderType,
+        customOrderType: checkoutInput.customOrderType,
         subtotal,
         discountTotal,
         taxTotal,
@@ -177,6 +182,7 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
         items: {
           create: preparedItems.map((item) => ({
             productId: item.input.productId,
+            warehouseId: item.input.warehouseId,
             quantity: item.baseQuantity,
             soldQuantity: item.input.quantity,
             soldUnit: item.soldUnit,
@@ -223,6 +229,23 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
     await transaction.auditLog.create({
       data: {
         actorId: actor.userId,
+        action: "INVENTORY_DEDUCTED_FOR_SALE",
+        entityType: "Sale",
+        entityId: sale.id,
+        metadata: {
+          receiptNumber: sale.receiptNumber,
+          items: preparedItems.map((item) => ({
+            productId: item.input.productId,
+            warehouseId: item.input.warehouseId,
+            quantity: item.baseQuantity
+          }))
+        }
+      }
+    });
+
+    await transaction.auditLog.create({
+      data: {
+        actorId: actor.userId,
         action: "SALE_COMPLETED",
         entityType: "Sale",
         entityId: sale.id,
@@ -240,6 +263,7 @@ async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSal
     });
 
     if (heldSale) {
+      await consumeOrderReservations(transaction, heldSale.id);
       const completed = await transaction.heldSale.updateMany({
         where: { id: heldSale.id, version: heldSale.checkout.expectedVersion, status: { notIn: ["COMPLETED", "CANCELLED"] } },
         data: {

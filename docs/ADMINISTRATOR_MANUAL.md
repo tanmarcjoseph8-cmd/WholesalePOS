@@ -23,3 +23,9 @@ Open Inventory and use Advanced Inventory Import to upload Excel or CSV, paste r
 Resolve invalid rows before confirmation. Product-name-only matches stay in manual review unless an explicit duplicate action is selected. Download the error report when corrections need to be made in the original workbook.
 
 Import History shows the operator, source, result counts, and status. Details and CSV reports remain available after import. Rollback is available only while no later product, sale, purchase, refund, or stock activity depends on the imported state.
+
+## Restaurant Reversal Permissions
+
+Administrators receive `orders.split-bill`, `sales.refund`, and `sales.void`. Cashiers retain normal checkout access but cannot reverse completed payments. Tables with active orders cannot be deactivated.
+
+Review reversal reasons, original sale references, restored quantities, and movement IDs in the audit trail before reconciling the cash drawer. Refunds and voids preserve the original sale and create compensating records instead of deleting financial history.

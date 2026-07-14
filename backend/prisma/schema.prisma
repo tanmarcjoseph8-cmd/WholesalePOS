@@ -30,6 +30,7 @@ model Store {
   inventoryImports   InventoryImportBatch[]
   importPresets      InventoryImportPreset[]
   restaurantTables   RestaurantTable[]
+  inventoryReservations InventoryReservation[]
 
   @@index([deletedAt])
 }
@@ -47,6 +48,9 @@ model Warehouse {
   movements   InventoryMovement[]
   stockAlerts StockAlert[]
   imports     InventoryImportBatch[]
+  reservations InventoryReservation[]
+  saleItems     SaleItem[]
+  refundItems   RefundItem[]
 
   @@unique([storeId, code])
   @@index([storeId, deletedAt])
@@ -224,6 +228,7 @@ model Product {
   purchaseOrderItems PurchaseOrderItem[]
   stockAlerts        StockAlert[]
   importRows         InventoryImportRow[]
+  reservations       InventoryReservation[]
 
   @@index([name])
   @@index([name, variant])
@@ -273,6 +278,7 @@ model InventoryMovement {
   warehouse       Warehouse           @relation(fields: [warehouseId], references: [id])
   createdBy       User?               @relation("InventoryMovementCreator", fields: [createdByUserId], references: [id])
   importRow       InventoryImportRow?
+  refundItem      RefundItem?
 
   @@index([productId, createdAt])
   @@index([warehouseId, createdAt])
@@ -381,6 +387,7 @@ model Sale {
   receiptNumber String            @unique
   orderNumber   String?           @unique
   orderType     String            @default("RETAIL")
+  customOrderType String?
   status        String            @default("COMPLETED")
   subtotal      Decimal
   discountTotal Decimal           @default(0)
@@ -412,6 +419,7 @@ model SaleItem {
   id           String  @id @default(cuid())
   saleId       String
   productId    String
+  warehouseId  String?
   quantity     Decimal
   soldQuantity Decimal @default(1)
   soldUnit     String  @default("PIECE")
@@ -422,9 +430,12 @@ model SaleItem {
   lineTotal    Decimal
   sale         Sale    @relation(fields: [saleId], references: [id])
   product      Product @relation(fields: [productId], references: [id])
+  warehouse    Warehouse? @relation(fields: [warehouseId], references: [id])
+  refundItems  RefundItem[]
 
   @@index([saleId])
   @@index([productId])
+  @@index([warehouseId])
 }
 
 model SalePayment {
@@ -494,8 +505,11 @@ model HeldSale {
   customerId     String?
   primaryTableId String?
   lockedByUserId String?
+  mergedIntoOrderId String?
+  splitFromOrderId String?
   orderNumber    String?           @unique
   orderType      String            @default("WALK_IN")
+  customOrderType String?
   status         String            @default("DRAFT")
   label          String?
   customerName   String?
@@ -526,13 +540,20 @@ model HeldSale {
   assignedTables RestaurantTable[] @relation("ActiveOrderTables")
   lockedBy       User?             @relation("HeldSaleLockOwner", fields: [lockedByUserId], references: [id])
   completedSale  Sale?             @relation("HeldSaleCompletion")
+  mergedInto     HeldSale?         @relation("HeldSaleMerges", fields: [mergedIntoOrderId], references: [id])
+  mergedOrders   HeldSale[]        @relation("HeldSaleMerges")
+  splitFrom      HeldSale?         @relation("HeldSaleSplits", fields: [splitFromOrderId], references: [id])
+  splitOrders    HeldSale[]        @relation("HeldSaleSplits")
   items          HeldSaleItem[]
+  reservations   InventoryReservation[]
 
   @@index([storeId, updatedAt])
   @@index([storeId, status, updatedAt])
   @@index([cashierId, updatedAt])
   @@index([primaryTableId])
   @@index([lockedByUserId, lockExpiresAt])
+  @@index([mergedIntoOrderId])
+  @@index([splitFromOrderId])
   @@index([deletedAt])
 }
 
@@ -553,11 +574,38 @@ model HeldSaleItem {
   deletedAt    DateTime?
   heldSale     HeldSale @relation(fields: [heldSaleId], references: [id])
   product      Product  @relation(fields: [productId], references: [id])
+  reservations InventoryReservation[]
 
   @@index([heldSaleId])
   @@index([productId])
   @@index([warehouseId])
   @@index([heldSaleId, deletedAt])
+}
+
+model InventoryReservation {
+  id             String       @id @default(cuid())
+  storeId        String
+  heldSaleId     String
+  heldSaleItemId String?
+  productId      String
+  warehouseId    String
+  quantity       Decimal
+  status         String       @default("ACTIVE")
+  reason         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  releasedAt     DateTime?
+  consumedAt     DateTime?
+  store          Store        @relation(fields: [storeId], references: [id])
+  heldSale       HeldSale     @relation(fields: [heldSaleId], references: [id])
+  heldSaleItem   HeldSaleItem? @relation(fields: [heldSaleItemId], references: [id])
+  product        Product      @relation(fields: [productId], references: [id])
+  warehouse      Warehouse    @relation(fields: [warehouseId], references: [id])
+
+  @@index([heldSaleId, status])
+  @@index([heldSaleItemId])
+  @@index([productId, warehouseId, status])
+  @@index([storeId, status, createdAt])
 }
 
 model RestaurantTable {
@@ -594,6 +642,8 @@ model Refund {
   cashierId      String
   customerId     String?
   originalSaleId String?
+  requestKey     String?           @unique
+  kind           String            @default("REFUND")
   receiptNumber  String            @unique
   reason         String
   subtotal       Decimal
@@ -617,18 +667,28 @@ model Refund {
 }
 
 model RefundItem {
-  id        String  @id @default(cuid())
-  refundId  String
-  productId String
-  quantity  Decimal
-  unitPrice Decimal
-  taxAmount Decimal @default(0)
-  lineTotal Decimal
-  refund    Refund  @relation(fields: [refundId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  id                  String             @id @default(cuid())
+  refundId            String
+  saleItemId          String?
+  productId           String
+  warehouseId         String?
+  inventoryMovementId String?            @unique
+  quantity            Decimal
+  soldQuantity        Decimal            @default(1)
+  baseQuantity        Decimal            @default(1)
+  unitPrice           Decimal
+  taxAmount           Decimal            @default(0)
+  lineTotal           Decimal
+  refund              Refund             @relation(fields: [refundId], references: [id])
+  saleItem            SaleItem?           @relation(fields: [saleItemId], references: [id])
+  product             Product            @relation(fields: [productId], references: [id])
+  warehouse           Warehouse?          @relation(fields: [warehouseId], references: [id])
+  inventoryMovement   InventoryMovement?  @relation(fields: [inventoryMovementId], references: [id])
 
   @@index([refundId])
   @@index([productId])
+  @@index([saleItemId])
+  @@index([warehouseId])
 }
 
 model RefundPayment {

@@ -14,8 +14,12 @@ const mocks = vi.hoisted(() => ({
   getRestaurantOrder: vi.fn(),
   listRestaurantOrders: vi.fn(),
   listRestaurantTables: vi.fn(),
+  mergeRestaurantOrders: vi.fn(),
   releaseRestaurantOrderLock: vi.fn(),
   reopenRestaurantOrder: vi.fn(),
+  restoreRestaurantTable: vi.fn(),
+  splitRestaurantOrder: vi.fn(),
+  undoRestaurantOrderItemChange: vi.fn(),
   updateRestaurantOrder: vi.fn(),
   updateRestaurantTable: vi.fn()
 }));
@@ -65,6 +69,9 @@ describe("restaurant routes", () => {
     mocks.listRestaurantOrders.mockResolvedValue({ items: [], pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 } });
     mocks.createRestaurantOrder.mockResolvedValue({ id: "order-1" });
     mocks.checkoutRestaurantOrder.mockResolvedValue({ id: "sale-1" });
+    mocks.mergeRestaurantOrders.mockResolvedValue({ id: "order-1" });
+    mocks.splitRestaurantOrder.mockResolvedValue({ source: { id: "order-1" }, split: { id: "order-2" } });
+    mocks.restoreRestaurantTable.mockResolvedValue({ id: "table-1", isActive: true });
   });
 
   const request = (path: string, init: RequestInit = {}, permission = "orders.manage") =>
@@ -107,5 +114,17 @@ describe("restaurant routes", () => {
     expect(forbidden.status).toBe(403);
     expect(allowed.status).toBe(201);
     expect(mocks.checkoutRestaurantOrder).toHaveBeenCalledOnce();
+  });
+
+  it("protects restore, merge, and split with their existing permissions", async () => {
+    const restore = await request("/api/restaurant/tables/table-1/restore", { method: "POST", body: "{}" }, "tables.manage");
+    const mergeBody = JSON.stringify({ expectedVersion: 1, sourceOrderId: "order-2", sourceExpectedVersion: 1, reason: "Same party" });
+    const forbiddenMerge = await request("/api/restaurant/orders/order-1/merge", { method: "POST", body: mergeBody }, "orders.manage");
+    const allowedMerge = await request("/api/restaurant/orders/order-1/merge", { method: "POST", body: mergeBody }, "orders.split-bill");
+    expect(restore.status).toBe(200);
+    expect(forbiddenMerge.status).toBe(403);
+    expect(allowedMerge.status).toBe(200);
+    expect(mocks.restoreRestaurantTable).toHaveBeenCalledOnce();
+    expect(mocks.mergeRestaurantOrders).toHaveBeenCalledOnce();
   });
 });
