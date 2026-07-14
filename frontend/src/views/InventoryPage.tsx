@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, Pencil, Plus, RefreshCw, Search, Trash2, Upload, X } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import type { FocusEvent } from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,15 +11,13 @@ import {
   fetchProducts,
   fetchStock,
   fetchWarehouses,
-  importProducts,
   type Product,
   type ProductCreatePayload,
-  type ProductImportPayload,
-  type ProductImportResult,
   updateProduct
 } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 import { refreshStockAwareViews } from "../lib/realtime";
+import { InventoryImportPanel } from "./inventory/InventoryImportPanel";
 
 const emptyProduct: ProductCreatePayload = {
   sku: "",
@@ -54,32 +52,6 @@ const unitOptions = [
   { value: "ROLL", label: "Roll" }
 ];
 
-const importTemplateHeaders = [
-  "Name",
-  "SKU",
-  "Barcode",
-  "Variant",
-  "Product Channel",
-  "Brand",
-  "Stock Unit",
-  "Selling Unit",
-  "Cost Price",
-  "Retail Price",
-  "Wholesale Price",
-  "Package Size",
-  "Wholesale Threshold",
-  "Low Stock Alert",
-  "Initial Stock",
-  "Unit Cost"
-];
-
-const unitAliases = new Map<string, string>(
-  unitOptions.flatMap((unit) => [
-    [unit.value.toLowerCase(), unit.value],
-    [unit.label.toLowerCase(), unit.value]
-  ])
-);
-
 function selectInputValue(event: FocusEvent<HTMLInputElement>) {
   event.currentTarget.select();
 }
@@ -103,73 +75,6 @@ function productToForm(product: Product): ProductCreatePayload {
   };
 }
 
-function normalizeHeader(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function readImportValue(row: Record<string, unknown>, aliases: string[]) {
-  const normalizedAliases = aliases.map(normalizeHeader);
-  const entry = Object.entries(row).find(([key]) => normalizedAliases.includes(normalizeHeader(key)));
-  return entry?.[1];
-}
-
-function readImportText(row: Record<string, unknown>, aliases: string[]) {
-  const value = readImportValue(row, aliases);
-  return value === null || value === undefined ? "" : String(value).trim();
-}
-
-function readImportNumber(row: Record<string, unknown>, aliases: string[], fallback: number) {
-  const value = readImportValue(row, aliases);
-  if (value === null || value === undefined || String(value).trim() === "") return fallback;
-  const parsed = Number(String(value).replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function readImportUnit(row: Record<string, unknown>, aliases: string[], fallback: string) {
-  const rawValue = readImportText(row, aliases);
-  if (!rawValue) return fallback;
-  return unitAliases.get(rawValue.toLowerCase()) ?? fallback;
-}
-
-function importRowToProduct(row: Record<string, unknown>): ProductImportPayload {
-  const inventoryUnit = readImportUnit(row, ["Stock Unit", "Inventory Unit", "Unit"], "PIECE");
-  const sellingUnit = readImportUnit(row, ["Selling Unit", "Sale Unit"], inventoryUnit);
-  const costPrice = readImportNumber(row, ["Cost Price", "Cost"], 0);
-  return {
-    name: readImportText(row, ["Name", "Product", "Product Name"]),
-    sku: readImportText(row, ["SKU", "Sku"]),
-    barcode: readImportText(row, ["Barcode", "Bar Code"]),
-    variant: readImportText(row, ["Variant", "Option"]),
-    salesChannel: (() => {
-      const value = readImportText(row, ["Product Channel", "Sales Channel", "Mode"]).toUpperCase();
-      return value === "RESTAURANT" || value === "BOTH" ? value : "RETAIL";
-    })(),
-    brand: readImportText(row, ["Brand"]),
-    inventoryUnit,
-    sellingUnit,
-    costPrice,
-    retailPrice: readImportNumber(row, ["Retail Price", "Retail", "Price"], 0),
-    wholesalePrice: readImportNumber(row, ["Wholesale Price", "Wholesale"], 0),
-    packageSize: Math.max(readImportNumber(row, ["Package Size", "Pack Size"], 1), 0.001),
-    wholesaleThreshold: readImportNumber(row, ["Wholesale Threshold", "Wholesale Qty"], 0),
-    minimumStock: readImportNumber(row, ["Low Stock Alert", "Minimum Stock", "Reorder Point"], 0),
-    initialStock: readImportNumber(row, ["Initial Stock", "Stock", "Quantity"], 0),
-    unitCost: readImportNumber(row, ["Unit Cost"], costPrice)
-  };
-}
-
-function validateImportRows(rows: ProductImportPayload[]) {
-  const errors: string[] = [];
-  rows.forEach((row, index) => {
-    const rowNumber = index + 2;
-    if (row.name.length < 2) errors.push(`Row ${rowNumber}: product name is required.`);
-    if (row.retailPrice < 0 || row.wholesalePrice < 0 || row.costPrice < 0) errors.push(`Row ${rowNumber}: prices cannot be negative.`);
-    if (row.packageSize <= 0) errors.push(`Row ${rowNumber}: package size must be greater than 0.`);
-    if (row.initialStock < 0) errors.push(`Row ${rowNumber}: initial stock cannot be negative.`);
-  });
-  return errors;
-}
-
 export function InventoryPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -177,9 +82,6 @@ export function InventoryPage() {
   const [product, setProduct] = useState<ProductCreatePayload>(emptyProduct);
   const [editingProductId, setEditingProductId] = useState("");
   const [editingProduct, setEditingProduct] = useState<ProductCreatePayload>(emptyProduct);
-  const [importRows, setImportRows] = useState<ProductImportPayload[]>([]);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [importResult, setImportResult] = useState<ProductImportResult | null>(null);
   const [stockProductOverrides, setStockProductOverrides] = useState<Product[]>([]);
   const [stockForm, setStockForm] = useState({
     productId: "",
@@ -287,17 +189,6 @@ export function InventoryPage() {
       await refreshStockAwareViews(queryClient);
     }
   });
-  const importMutation = useMutation({
-    mutationFn: () => importProducts({ warehouseId: selectedWarehouseId, rows: importRows }),
-    onSuccess: async (result) => {
-      setImportResult(result);
-      if (result.createdCount > 0) {
-        setImportRows([]);
-      }
-      await refreshStockAwareViews(queryClient);
-    }
-  });
-
   const productCount = useMemo(() => products.data?.pagination.total ?? 0, [products.data?.pagination.total]);
   const canSaveStock = Boolean(stockForm.productId && selectedWarehouseId && stockForm.quantity > 0 && stockForm.reason.trim().length >= 3);
 
@@ -314,39 +205,6 @@ export function InventoryPage() {
     }
   }
 
-  async function loadImportFile(file: File) {
-    setImportResult(null);
-    setImportErrors([]);
-    const XLSX = await import("xlsx");
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const [firstSheetName] = workbook.SheetNames;
-    const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined;
-    if (!worksheet) {
-      setImportRows([]);
-      setImportErrors(["The file does not contain a readable sheet."]);
-      return;
-    }
-
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
-    const parsedRows = rawRows.map(importRowToProduct).filter((row) => row.name || row.sku || row.barcode);
-    const validationErrors = validateImportRows(parsedRows);
-    setImportRows(parsedRows);
-    setImportErrors(validationErrors);
-  }
-
-  function downloadImportTemplate() {
-    void (async () => {
-      const XLSX = await import("xlsx");
-      const worksheet = XLSX.utils.aoa_to_sheet([
-        importTemplateHeaders,
-        ["Steel Bar", "", "123456789012", "Generic", "Piece", "Piece", 180, 220, 200, 1, 10, 5, 25, 180]
-      ]);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
-      XLSX.writeFile(workbook, "WholesalePOS-product-import-template.xlsx");
-    })();
-  }
-
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -357,10 +215,6 @@ export function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="focus-ring inline-flex items-center gap-2 rounded-md border border-slate-200 px-4 py-2 text-sm font-bold dark:border-slate-700" onClick={downloadImportTemplate}>
-            <Download size={18} />
-            Template
-          </button>
           <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ocean px-4 py-2 text-sm font-bold text-white" onClick={() => setIsAdding(true)}>
             <Plus size={18} />
             Add Product
@@ -378,87 +232,7 @@ export function InventoryPage() {
         />
       </div>
 
-      <section className="rounded-md border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-bold">Import Products</h3>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Upload an Excel or CSV file with product rows and optional starting stock.</p>
-          </div>
-          <label className="focus-ring inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-4 py-2 text-sm font-bold dark:border-slate-700">
-            <FileSpreadsheet size={18} />
-            Choose File
-            <input
-              className="sr-only"
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void loadImportFile(file);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
-        </div>
-        {importRows.length ? (
-          <div className="mt-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-100 p-3 text-sm dark:bg-slate-800">
-              <span className="font-semibold">
-                {importRows.length} product row{importRows.length === 1 ? "" : "s"} ready for review.
-              </span>
-              <button
-                className="focus-ring inline-flex items-center gap-2 rounded-md bg-mint px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={importMutation.isPending || importErrors.length > 0 || !selectedWarehouseId}
-                onClick={() => importMutation.mutate()}
-              >
-                <Upload size={16} />
-                {importMutation.isPending ? "Importing..." : "Import Products"}
-              </button>
-            </div>
-            {importErrors.length ? (
-              <div className="rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose">
-                {importErrors.slice(0, 5).map((error) => (
-                  <p key={error}>{error}</p>
-                ))}
-                {importErrors.length > 5 ? <p>{importErrors.length - 5} more import issue{importErrors.length - 5 === 1 ? "" : "s"} found.</p> : null}
-              </div>
-            ) : null}
-            {importMutation.error ? <p className="rounded-md bg-rose/10 p-3 text-sm font-semibold text-rose">{importMutation.error.message}</p> : null}
-            <div className="max-h-72 overflow-auto rounded-md border border-slate-200 dark:border-slate-700">
-              <table className="w-full min-w-[780px] text-left text-sm">
-                <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  <tr>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Barcode</th>
-                    <th className="px-4 py-3">Retail</th>
-                    <th className="px-4 py-3">Stock</th>
-                    <th className="px-4 py-3">Low Alert</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importRows.slice(0, 25).map((row, index) => (
-                    <tr key={`${row.name}-${index}`} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="px-4 py-3 font-semibold">{row.name || "-"}</td>
-                      <td className="px-4 py-3">{row.sku || "-"}</td>
-                      <td className="px-4 py-3">{row.barcode || "-"}</td>
-                      <td className="px-4 py-3">{formatCurrency(row.retailPrice)}</td>
-                      <td className="px-4 py-3">
-                        {row.initialStock.toLocaleString(undefined, { maximumFractionDigits: 3 })} {row.inventoryUnit.toLowerCase()}
-                      </td>
-                      <td className="px-4 py-3">{row.minimumStock.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
-        {importResult ? (
-          <div className="mt-4 rounded-md bg-mint/10 p-3 text-sm font-semibold text-mint">
-            Imported {importResult.createdCount} product{importResult.createdCount === 1 ? "" : "s"}. {importResult.failedCount ? `${importResult.failedCount} row${importResult.failedCount === 1 ? "" : "s"} failed.` : "No failed rows."}
-          </div>
-        ) : null}
-      </section>
+      <InventoryImportPanel warehouses={warehouses.data ?? []} defaultWarehouseId={selectedWarehouseId} />
 
       {isAdding ? (
         <form

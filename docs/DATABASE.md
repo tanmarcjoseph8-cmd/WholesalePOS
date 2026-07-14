@@ -51,6 +51,20 @@ The `20260714110500_pos_mode_foundations` migration is additive:
 
 Business mode, import defaults, and restaurant options use the existing `Setting` table. No duplicate configuration table is required.
 
+## Advanced Inventory Imports
+
+The 20260714193000_advanced_inventory_import migration adds only import workflow records:
+
+- InventoryImportBatch stores source identity, mode, warehouse, user, counts, duration, status, and rollback metadata.
+- InventoryImportRow stores each row's action, result, matched product, inventory movement, before/after product snapshot, before/after stock, warnings, and errors.
+- InventoryImportPreset stores reusable source-column mappings per store.
+
+Products remain in Product, balances remain in InventoryStock, and permanent stock changes remain in InventoryMovement. Import rows reference those authoritative records instead of duplicating them.
+
+Confirmed rows run in configurable transaction batches. A failed batch is retried one row at a time so valid independent rows can still complete while each failed row receives a durable error result.
+
+Rollback never deletes operational history. It creates inverse IMPORT_ROLLBACK movements, restores an updated product from its saved snapshot, and soft-deletes products created solely by the import. Rollback requires the imported movement to remain the latest stock activity and the imported product snapshot to remain unchanged.
+
 ## Soft Deletes
 
 Operational entities include `deletedAt` and are filtered at the service layer.

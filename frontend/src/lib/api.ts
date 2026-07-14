@@ -239,6 +239,106 @@ const productImportResultSchema = z.object({
   errors: z.array(z.object({ rowNumber: z.number(), name: z.string(), message: z.string() }))
 });
 
+const inventoryImportModeSchema = z.enum(["ADD_NEW", "UPDATE_EXISTING", "ADD_AND_UPDATE", "ADD_STOCK", "REPLACE_STOCK", "ADJUST_STOCK", "INITIAL_INVENTORY"]);
+
+const inventoryImportNormalizedRowSchema = z
+  .object({
+    rowNumber: z.number(),
+    productId: z.string().optional(),
+    sku: z.string().optional(),
+    barcode: z.string().optional(),
+    name: z.string().optional(),
+    variant: z.string().optional(),
+    salesChannel: z.enum(["RETAIL", "RESTAURANT", "BOTH"]).optional(),
+    stock: z.number().optional()
+  })
+  .passthrough();
+
+const inventoryImportPreviewRowSchema = z.object({
+  rowNumber: z.number(),
+  status: z.enum(["VALID", "WARNING", "INVALID"]),
+  action: z.enum(["CREATE", "UPDATE", "STOCK", "SKIP", "REVIEW", "INVALID"]),
+  matchMethod: z.enum(["PRODUCT_ID", "SKU", "BARCODE", "NAME_VARIANT", "NAME"]).optional(),
+  matchedProduct: z
+    .object({ id: z.string(), sku: z.string(), name: z.string(), variant: z.string().nullable(), updatedAt: z.string() })
+    .optional(),
+  normalized: inventoryImportNormalizedRowSchema,
+  warnings: z.array(z.string()),
+  errors: z.array(z.string()),
+  previousStock: z.coerce.number().optional(),
+  stockDelta: z.coerce.number()
+});
+
+const inventoryImportPreviewSchema = z.object({
+  fingerprint: z.string(),
+  duplicateBatch: z.object({ id: z.string(), sourceName: z.string(), createdAt: z.string(), status: z.string() }).nullable(),
+  mode: inventoryImportModeSchema,
+  warehouse: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  rows: z.array(inventoryImportPreviewRowSchema),
+  summary: z.object({
+    rowCount: z.number(),
+    validCount: z.number(),
+    warningCount: z.number(),
+    invalidCount: z.number(),
+    createCount: z.number(),
+    updateCount: z.number(),
+    stockCount: z.number(),
+    skippedCount: z.number(),
+    reviewCount: z.number(),
+    stockDelta: z.coerce.number()
+  })
+});
+
+const inventoryImportRowResultSchema = z.object({
+  id: z.string(),
+  rowNumber: z.number(),
+  action: z.string(),
+  status: z.string(),
+  matchMethod: z.string().nullable(),
+  previousStock: z.coerce.number().nullable(),
+  newStock: z.coerce.number().nullable(),
+  quantityChanged: z.coerce.number().nullable(),
+  warnings: z.array(z.string()).nullable(),
+  errors: z.array(z.string()).nullable(),
+  product: z.object({ id: z.string(), sku: z.string(), name: z.string(), variant: z.string().nullable() }).nullable()
+});
+
+const inventoryImportBatchSchema = z.object({
+  id: z.string(),
+  mode: inventoryImportModeSchema,
+  status: z.string(),
+  sourceName: z.string(),
+  rowCount: z.number(),
+  validCount: z.number(),
+  warningCount: z.number(),
+  invalidCount: z.number(),
+  createdCount: z.number(),
+  updatedCount: z.number(),
+  skippedCount: z.number(),
+  failedCount: z.number(),
+  stockDelta: z.coerce.number(),
+  durationMs: z.number().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  rolledBackAt: z.string().nullable(),
+  warehouse: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  createdBy: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+  rolledBackBy: z.object({ id: z.string(), name: z.string(), email: z.string() }).nullable(),
+  rows: z.array(inventoryImportRowResultSchema).optional()
+});
+
+const inventoryImportListSchema = z.object({
+  items: z.array(inventoryImportBatchSchema),
+  pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
+});
+
+const inventoryImportPresetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  mapping: z.record(z.string()),
+  createdAt: z.string()
+});
+
 export type AuthSession = z.infer<typeof authSessionSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type ManagedUser = z.infer<typeof managedUserSchema>;
@@ -276,6 +376,48 @@ export type ProductImportPayload = ProductCreatePayload & {
 };
 
 export type ProductImportResult = z.infer<typeof productImportResultSchema>;
+export type InventoryImportMode = z.infer<typeof inventoryImportModeSchema>;
+export type InventoryImportDuplicateAction = "SKIP" | "UPDATE" | "MERGE" | "MANUAL_REVIEW";
+export type InventoryImportPreview = z.infer<typeof inventoryImportPreviewSchema>;
+export type InventoryImportBatch = z.infer<typeof inventoryImportBatchSchema>;
+export type InventoryImportPreset = z.infer<typeof inventoryImportPresetSchema>;
+export type InventoryImportRowInput = {
+  rowNumber: number;
+  productId?: unknown;
+  sku?: unknown;
+  barcode?: unknown;
+  name?: unknown;
+  variant?: unknown;
+  salesChannel?: unknown;
+  description?: unknown;
+  category?: unknown;
+  brand?: unknown;
+  supplier?: unknown;
+  inventoryUnit?: unknown;
+  sellingUnit?: unknown;
+  unitRatioToBase?: unknown;
+  packageSize?: unknown;
+  costPrice?: unknown;
+  retailPrice?: unknown;
+  wholesalePrice?: unknown;
+  vipPrice?: unknown;
+  stock?: unknown;
+  minimumStock?: unknown;
+  taxRate?: unknown;
+  status?: unknown;
+  expiresAt?: unknown;
+  batchNumber?: unknown;
+  branch?: unknown;
+  location?: unknown;
+  notes?: unknown;
+};
+export type InventoryImportRequest = {
+  warehouseId: string;
+  mode: InventoryImportMode;
+  duplicateAction: InventoryImportDuplicateAction;
+  source: { name: string; sizeBytes?: number; fingerprint?: string };
+  rows: InventoryImportRowInput[];
+};
 
 export type ProductUpdatePayload = ProductCreatePayload & {
   id: string;
@@ -318,6 +460,18 @@ async function apiRequest(path: string, options: RequestInit = {}) {
   }
 
   return response.json();
+}
+
+async function apiFileRequest(path: string) {
+  const session = getStoredSession();
+  const response = await fetch(`${apiUrl}${path}`, {
+    headers: { ...(session ? { Authorization: `Bearer ${session.accessToken}` } : {}) }
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? "The download failed.");
+  }
+  return response.blob();
 }
 
 export async function fetchHealth(): Promise<ApiHealth> {
@@ -605,6 +759,48 @@ export async function importProducts(input: { warehouseId?: string; rows: Produc
       })
     })
   );
+}
+
+export async function previewInventoryImport(input: InventoryImportRequest) {
+  return inventoryImportPreviewSchema.parse(
+    await apiRequest("/api/inventory-imports/preview", { method: "POST", body: JSON.stringify(input) })
+  );
+}
+
+export async function executeInventoryImport(input: InventoryImportRequest & { previewFingerprint: string }) {
+  return inventoryImportBatchSchema.parse(
+    await apiRequest("/api/inventory-imports/execute", { method: "POST", body: JSON.stringify(input) })
+  );
+}
+
+export async function fetchInventoryImports() {
+  return inventoryImportListSchema.parse(await apiRequest("/api/inventory-imports?pageSize=50"));
+}
+
+export async function fetchInventoryImport(batchId: string) {
+  return inventoryImportBatchSchema.parse(await apiRequest(`/api/inventory-imports/${batchId}`));
+}
+
+export async function rollbackInventoryImport(batchId: string) {
+  return inventoryImportBatchSchema.parse(await apiRequest(`/api/inventory-imports/${batchId}/rollback`, { method: "POST" }));
+}
+
+export async function fetchInventoryImportPresets() {
+  return z.array(inventoryImportPresetSchema).parse(await apiRequest("/api/inventory-imports/presets"));
+}
+
+export async function createInventoryImportPreset(input: { name: string; mapping: Record<string, string> }) {
+  return inventoryImportPresetSchema.parse(
+    await apiRequest("/api/inventory-imports/presets", { method: "POST", body: JSON.stringify(input) })
+  );
+}
+
+export async function deleteInventoryImportPreset(presetId: string) {
+  return z.object({ success: z.boolean() }).parse(await apiRequest(`/api/inventory-imports/presets/${presetId}`, { method: "DELETE" }));
+}
+
+export async function downloadInventoryImportReport(batchId: string) {
+  return apiFileRequest(`/api/inventory-imports/${batchId}/report`);
 }
 
 export async function updateProduct(input: ProductUpdatePayload) {

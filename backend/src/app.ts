@@ -12,6 +12,7 @@ import { apiRateLimit } from "./middleware/rate-limit.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
 import { inventoryRouter } from "./modules/inventory/inventory.routes.js";
+import { inventoryImportRouter } from "./modules/inventory-imports/inventory-import.routes.js";
 import { productRouter } from "./modules/products/product.routes.js";
 import { receiptRouter } from "./modules/receipts/receipt.routes.js";
 import { reportRouter } from "./modules/reports/report.routes.js";
@@ -26,7 +27,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(compression());
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "20mb" }));
   app.use(express.urlencoded({ extended: false }));
   app.use(cookieParser());
   app.use(requestLogger);
@@ -35,6 +36,7 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/inventory", inventoryRouter);
+  app.use("/api/inventory-imports", inventoryImportRouter);
   app.use("/api/products", productRouter);
   app.use("/api/receipts", receiptRouter);
   app.use("/api/reports", reportRouter);

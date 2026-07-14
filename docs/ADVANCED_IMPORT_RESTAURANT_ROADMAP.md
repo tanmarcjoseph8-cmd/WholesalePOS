@@ -30,7 +30,7 @@ Existing products and sales receive `RETAIL` defaults. Existing stored settings 
 
 ## Phase 2 Advanced Inventory Import
 
-The advanced import module will own file fingerprinting, backend validation, matching candidates, preview results, confirmation, transactional batch execution, history, reports, and safe rollback. The frontend will provide file upload, drag and drop, clipboard paste, manual grid entry, template export, column mapping, row editing, filtering, and confirmation.
+Phase 2 is implemented. The advanced import module owns file fingerprinting, backend validation, matching candidates, preview results, confirmation, transactional batch execution, history, reports, mapping presets, duplicate prevention, and safe rollback. The frontend provides file upload, drag and drop, clipboard paste, manual grid entry, template and product export, column mapping, row editing, filtering, error export, and confirmation.
 
 Product matching will use this order:
 
@@ -40,7 +40,7 @@ Product matching will use this order:
 4. Exact normalized product name and variant.
 5. Exact normalized product name as a manual-review candidate.
 
-Uncertain matches will never be merged automatically.
+Uncertain name-only matches require manual Product ID selection or an explicit duplicate action.
 
 ## Phase 3 Restaurant Orders
 

@@ -14,4 +14,10 @@ When creating or editing a product in Inventory, choose Retail, Restaurant, or R
 
 ## Import Defaults
 
-Settings includes the import batch size, duplicate-file protection, and default import mode. These defaults prepare the advanced import workflow while preserving the existing product import screen.
+Settings includes import batch size, duplicate-file protection, and the default import mode.
+
+Open Inventory and use Advanced Inventory Import to upload Excel or CSV, paste rows from Excel or Google Sheets, or enter rows in the manual grid. Review detected column mappings, select a warehouse and mode, then choose Preview Import.
+
+Resolve invalid rows before confirmation. Product-name-only matches stay in manual review unless an explicit duplicate action is selected. Download the error report when corrections need to be made in the original workbook.
+
+Import History shows the operator, source, result counts, and status. Details and CSV reports remain available after import. Rollback is available only while no later product, sale, purchase, refund, or stock activity depends on the imported state.

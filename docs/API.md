@@ -130,6 +130,46 @@ Sets stock to a counted quantity and stores the signed adjustment delta permanen
 
 Transfers stock between warehouses in one database transaction. The API writes paired transfer movement rows and publishes local inventory update events.
 
+## Inventory Imports
+
+Import endpoints require the inventory.import permission; rollback additionally requires inventory.import.rollback.
+
+### POST /inventory-imports/preview
+
+Validates up to 10,000 mapped spreadsheet rows without changing products or stock. Matching priority is Product ID, SKU, barcode, product name plus variant, then product name. Name-only matches require an explicit duplicate action or manual Product ID. The response contains row status, action, warnings, errors, stock difference, summary totals, duplicate-batch information, and a confirmation fingerprint.
+
+### POST /inventory-imports/execute
+
+Revalidates the complete request and requires the exact fingerprint returned by preview. Valid rows are processed in configured transaction batches. Product changes, stock balances, inventory movements, row results, and audit records are persisted together. A previously completed identical import is rejected when duplicate-file protection is enabled.
+
+### GET /inventory-imports
+
+Returns paginated import history for the current store.
+
+### GET /inventory-imports/:id
+
+Returns a batch with row-level results and before/after stock quantities.
+
+### GET /inventory-imports/:id/report
+
+Downloads a CSV report containing every row, result, stock difference, warning, and error.
+
+### POST /inventory-imports/:id/rollback
+
+Safely reverses a completed batch. Rollback is rejected when a product changed, a later stock movement exists, or a newly imported product is used by a sale, held sale, refund, or purchase order.
+
+### GET /inventory-imports/presets
+
+Lists active column-mapping presets.
+
+### POST /inventory-imports/presets
+
+Creates a named mapping preset.
+
+### DELETE /inventory-imports/presets/:id
+
+Soft-deletes a mapping preset.
+
 ## Users
 
 All user endpoints require `Authorization: Bearer <accessToken>` and the `users.manage` permission.

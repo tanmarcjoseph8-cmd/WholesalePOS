@@ -74,6 +74,41 @@ function requestJson(port, pathname, options = {}) {
   });
 }
 
+function requestText(port, pathname, options = {}) {
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: pathname,
+        method: options.method ?? "GET",
+        timeout: 2_500,
+        headers: {
+          Accept: "text/csv",
+          ...(options.token ? { Authorization: "Bearer " + options.token } : {})
+        }
+      },
+      (response) => {
+        let data = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          data += chunk;
+        });
+        response.on("end", () => {
+          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+          reject(new Error("Request failed with status " + (response.statusCode ?? "unknown") + "."));
+        });
+      }
+    );
+    request.on("error", reject);
+    request.on("timeout", () => request.destroy(new Error("Request timed out.")));
+    request.end();
+  });
+}
+
 function findAvailablePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -324,6 +359,69 @@ try {
   const importedStockQuantity = importedStock?.items?.[0]?.quantity;
   if (Math.abs(Number(importedStockQuantity) - 7) > 0.0001) {
     throw new Error(`Product import initial stock failed. Expected 7, got ${importedStockQuantity}.`);
+  }
+
+  const advancedImportRequest = {
+    warehouseId,
+    mode: "ADD_NEW",
+    duplicateAction: "MANUAL_REVIEW",
+    source: { name: "advanced-smoke.xlsx", fingerprint: "advanced-smoke-file-hash" },
+    rows: [
+      {
+        rowNumber: 2,
+        sku: "ADV-SMOKE-1",
+        barcode: "555555555001",
+        name: "Advanced Import Product",
+        inventoryUnit: "PIECE",
+        sellingUnit: "PIECE",
+        costPrice: 40,
+        retailPrice: 60,
+        wholesalePrice: 50,
+        stock: 4,
+        minimumStock: 1,
+        status: "ACTIVE"
+      }
+    ]
+  };
+  const advancedPreview = await requestJson(port, "/api/inventory-imports/preview", {
+    method: "POST",
+    token: session.accessToken,
+    body: advancedImportRequest
+  });
+  if (advancedPreview?.summary?.createCount !== 1 || advancedPreview?.summary?.invalidCount !== 0 || !advancedPreview?.fingerprint) {
+    throw new Error("Advanced import preview smoke test failed.");
+  }
+  const advancedBatch = await requestJson(port, "/api/inventory-imports/execute", {
+    method: "POST",
+    token: session.accessToken,
+    body: { ...advancedImportRequest, previewFingerprint: advancedPreview.fingerprint }
+  });
+  if (advancedBatch?.status !== "COMPLETED" || advancedBatch?.createdCount !== 1 || advancedBatch?.rows?.[0]?.status !== "SUCCESS") {
+    throw new Error("Advanced import execution smoke test failed.");
+  }
+  const advancedProductId = advancedBatch.rows[0].product.id;
+  const advancedStock = await requestJson(port, "/api/inventory/stock?productId=" + advancedProductId, { token: session.accessToken });
+  if (Math.abs(Number(advancedStock?.items?.[0]?.quantity) - 4) > 0.0001) {
+    throw new Error("Advanced import stock persistence smoke test failed.");
+  }
+  const importHistory = await requestJson(port, "/api/inventory-imports?pageSize=10", { token: session.accessToken });
+  if (!importHistory?.items?.some((batch) => batch.id === advancedBatch.id)) {
+    throw new Error("Advanced import history smoke test failed.");
+  }
+  const importReport = await requestText(port, "/api/inventory-imports/" + advancedBatch.id + "/report", { token: session.accessToken });
+  if (!importReport.includes("Advanced Import Product") || !importReport.includes("SUCCESS")) {
+    throw new Error("Advanced import report smoke test failed.");
+  }
+  const rolledBackBatch = await requestJson(port, "/api/inventory-imports/" + advancedBatch.id + "/rollback", {
+    method: "POST",
+    token: session.accessToken
+  });
+  if (rolledBackBatch?.status !== "ROLLED_BACK") {
+    throw new Error("Advanced import rollback smoke test failed.");
+  }
+  const rolledBackProducts = await requestJson(port, "/api/products?search=ADV-SMOKE-1&pageSize=10", { token: session.accessToken });
+  if (rolledBackProducts?.items?.length !== 0) {
+    throw new Error("Rolled-back imported product should not remain active.");
   }
 
   await requestJson(port, "/api/inventory/movements", {

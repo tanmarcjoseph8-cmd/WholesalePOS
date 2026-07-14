@@ -1,10 +1,9 @@
 import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, RefreshCw, Search, Settings, Sun, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardPage } from "../views/DashboardPage";
 import { PosPage } from "../views/PosPage";
-import { InventoryPage } from "../views/InventoryPage";
 import { ReportsPage } from "../views/ReportsPage";
 import { SettingsPage } from "../views/SettingsPage";
 import { UsersPage } from "../views/UsersPage";
@@ -22,6 +21,18 @@ import {
   verifyPassword,
   type AuthSession
 } from "../lib/api";
+
+const InventoryPage = lazy(() => import("../views/InventoryPage").then((module) => ({ default: module.InventoryPage })));
+
+function InventoryPageLoader() {
+  return (
+    <div className="space-y-4" aria-busy="true">
+      <div className="h-9 w-56 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+      <div className="h-48 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+      <div className="h-72 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
+    </div>
+  );
+}
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: ChartNoAxesCombined },
@@ -427,7 +438,19 @@ export function App() {
             <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
             <Route
               path="/inventory"
-              element={canManageProducts ? inventoryUnlocked ? <InventoryPage /> : <InventoryPasswordGate onUnlock={() => setInventoryUnlocked(true)} /> : <DashboardPage />}
+              element={
+                canManageProducts ? (
+                  inventoryUnlocked ? (
+                    <Suspense fallback={<InventoryPageLoader />}>
+                      <InventoryPage />
+                    </Suspense>
+                  ) : (
+                    <InventoryPasswordGate onUnlock={() => setInventoryUnlocked(true)} />
+                  )
+                ) : (
+                  <DashboardPage />
+                )
+              }
             />
             <Route path="/reports" element={canUseSales ? <ReportsPage /> : <DashboardPage />} />
             <Route path="/settings" element={canManageSettings ? <SettingsPage /> : <DashboardPage />} />

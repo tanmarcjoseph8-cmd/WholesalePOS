@@ -8,7 +8,7 @@ The app now supports a practical single-device POS workflow:
 
 - First-run owner setup, secure login, roles, and protected screens.
 - Product, inventory, stock adjustment, stock history, and low-stock controls.
-- Excel/CSV product import for bulk product setup, including optional starting stock.
+- Advanced Excel/CSV inventory import with drag and drop, spreadsheet paste, manual grid entry, column mapping presets, backend preview, batch history, reports, duplicate protection, and safe rollback.
 - Low-stock reorder list with suggested reorder quantities.
 - POS checkout with barcode/search input, decimal quantities, cash, GCash, and mixed payments.
 - Variable quantity selling such as grams from kilogram stock, milliliters from liter stock, or yards from meter stock.
