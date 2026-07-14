@@ -38,6 +38,19 @@ Phase 3 expands the schema with durable records for the remaining commercial POS
 
 `Product` now includes `packageSize` and `wholesaleThreshold` so later POS phases can support partial quantity selling and automatic wholesale pricing.
 
+## POS Mode Foundation
+
+The `20260714110500_pos_mode_foundations` migration is additive:
+
+- `Product.variant` supports exact product-name and variant matching.
+- `Product.salesChannel` identifies Retail, Restaurant, or Both products and defaults existing rows to `RETAIL`.
+- `Sale.orderType` identifies Retail, Dine-in, Takeout, Delivery, or Walk-in sales and defaults existing rows to `RETAIL`.
+- `Sale.orderNumber` stores an optional restaurant-facing order number.
+- `Sale.serviceCharge` and `Sale.tip` store restaurant charges without changing line-item inventory quantities.
+- New permission rows prepare existing Owner, Administrator, and Cashier roles for import and restaurant workflows.
+
+Business mode, import defaults, and restaurant options use the existing `Setting` table. No duplicate configuration table is required.
+
 ## Soft Deletes
 
 Operational entities include `deletedAt` and are filtered at the service layer.

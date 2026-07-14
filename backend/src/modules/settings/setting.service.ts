@@ -8,12 +8,25 @@ import type { Actor } from "../auth/actor.js";
 import type { SettingsUpdateInput } from "./setting.schemas.js";
 
 const defaults = {
+  businessMode: { mode: "RETAIL" },
   business: { name: "WholesalePOS Store", phone: "", email: "", address: "" },
   tax: { vatRate: 0, pricesIncludeVat: false },
   receipt: { footer: "Thank you", paperWidth: "80mm" },
   printer: { printerName: "Windows default printer", printerType: "WINDOWS" },
   theme: { mode: "system" },
-  backup: { automaticBackupsEnabled: true, retentionDays: 30 }
+  backup: { automaticBackupsEnabled: true, retentionDays: 30 },
+  inventoryImport: { batchSize: 250, preventDuplicateFiles: true, defaultMode: "ADD_AND_UPDATE" },
+  restaurant: {
+    enableTables: true,
+    allowWalkInOrders: true,
+    enableDelivery: false,
+    enableTakeout: true,
+    enableKitchenTickets: false,
+    serviceChargeRate: 0,
+    splitBilling: false,
+    partialPayments: false,
+    orderNumberFormat: "{TYPE}-{NUMBER}"
+  }
 };
 
 function databasePath() {
@@ -30,12 +43,15 @@ function backupDirectory() {
 
 function mergeSettings(saved: Record<string, unknown>) {
   return {
+    businessMode: { ...defaults.businessMode, ...(saved.businessMode as object | undefined) },
     business: { ...defaults.business, ...(saved.business as object | undefined) },
     tax: { ...defaults.tax, ...(saved.tax as object | undefined) },
     receipt: { ...defaults.receipt, ...(saved.receipt as object | undefined) },
     printer: { ...defaults.printer, ...(saved.printer as object | undefined) },
     theme: { ...defaults.theme, ...(saved.theme as object | undefined) },
-    backup: { ...defaults.backup, ...(saved.backup as object | undefined) }
+    backup: { ...defaults.backup, ...(saved.backup as object | undefined) },
+    inventoryImport: { ...defaults.inventoryImport, ...(saved.inventoryImport as object | undefined) },
+    restaurant: { ...defaults.restaurant, ...(saved.restaurant as object | undefined) }
   };
 }
 

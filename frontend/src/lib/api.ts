@@ -55,6 +55,8 @@ const productSchema = z.object({
   id: z.string(),
   sku: z.string(),
   name: z.string(),
+  variant: z.string().nullable(),
+  salesChannel: z.enum(["RETAIL", "RESTAURANT", "BOTH"]),
   brand: z.string().nullable(),
   inventoryUnit: z.string(),
   sellingUnit: z.string(),
@@ -128,6 +130,8 @@ const inventoryMovementSchema = z.object({
 const saleSummarySchema = z.object({
   id: z.string(),
   receiptNumber: z.string(),
+  orderNumber: z.string().nullable().optional(),
+  orderType: z.enum(["RETAIL", "DINE_IN", "TAKEOUT", "DELIVERY", "WALK_IN"]).optional(),
   grandTotal: z.coerce.number(),
   paidTotal: z.coerce.number(),
   changeTotal: z.coerce.number()
@@ -182,12 +186,29 @@ const reportExportSchema = z.object({
 });
 
 const appSettingsSchema = z.object({
+  businessMode: z.object({ mode: z.enum(["RETAIL", "RESTAURANT", "HYBRID"]) }),
   business: z.object({ name: z.string(), phone: z.string(), email: z.string(), address: z.string() }),
   tax: z.object({ vatRate: z.number(), pricesIncludeVat: z.boolean() }),
   receipt: z.object({ footer: z.string(), paperWidth: z.enum(["58mm", "80mm"]) }),
   printer: z.object({ printerName: z.string(), printerType: z.enum(["WINDOWS", "ESC_POS"]) }),
   theme: z.object({ mode: z.enum(["light", "dark", "system"]) }),
-  backup: z.object({ automaticBackupsEnabled: z.boolean(), retentionDays: z.number() })
+  backup: z.object({ automaticBackupsEnabled: z.boolean(), retentionDays: z.number() }),
+  inventoryImport: z.object({
+    batchSize: z.number(),
+    preventDuplicateFiles: z.boolean(),
+    defaultMode: z.enum(["ADD_NEW", "UPDATE_EXISTING", "ADD_AND_UPDATE", "ADD_STOCK", "REPLACE_STOCK", "ADJUST_STOCK", "INITIAL_INVENTORY"])
+  }),
+  restaurant: z.object({
+    enableTables: z.boolean(),
+    allowWalkInOrders: z.boolean(),
+    enableDelivery: z.boolean(),
+    enableTakeout: z.boolean(),
+    enableKitchenTickets: z.boolean(),
+    serviceChargeRate: z.number(),
+    splitBilling: z.boolean(),
+    partialPayments: z.boolean(),
+    orderNumberFormat: z.string()
+  })
 });
 
 const backupRunSchema = z.object({
@@ -235,6 +256,8 @@ export type BackupRun = z.infer<typeof backupRunSchema>;
 export type ProductCreatePayload = {
   sku?: string | null;
   name: string;
+  variant?: string | null;
+  salesChannel: "RETAIL" | "RESTAURANT" | "BOTH";
   brand?: string | null;
   barcode?: string | null;
   inventoryUnit: string;
@@ -421,6 +444,10 @@ export async function adjustInventoryCount(input: { productId: string; warehouse
 export async function createSale(input: {
   items: Array<{ productId: string; warehouseId: string; quantity: number; soldUnit?: string; unitPrice?: number; discount: number }>;
   payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
+  orderNumber?: string | null;
+  orderType?: "RETAIL" | "DINE_IN" | "TAKEOUT" | "DELIVERY" | "WALK_IN";
+  serviceCharge?: number;
+  tip?: number;
 }) {
   return saleSummarySchema.passthrough().parse(
     await apiRequest("/api/sales", {
@@ -505,6 +532,8 @@ export async function createProduct(input: ProductCreatePayload) {
       body: JSON.stringify({
         sku: input.sku?.trim() ? input.sku.trim() : undefined,
         name: input.name,
+        variant: input.variant?.trim() ? input.variant.trim() : null,
+        salesChannel: input.salesChannel,
         brand: input.brand?.trim() ? input.brand.trim() : null,
         description: null,
         imageUrl: null,
@@ -544,6 +573,8 @@ export async function importProducts(input: { warehouseId?: string; rows: Produc
           return {
             sku: row.sku?.trim() ? row.sku.trim() : undefined,
             name: row.name,
+            variant: row.variant?.trim() ? row.variant.trim() : null,
+            salesChannel: row.salesChannel,
             brand: row.brand?.trim() ? row.brand.trim() : null,
             description: null,
             imageUrl: null,
@@ -585,6 +616,8 @@ export async function updateProduct(input: ProductUpdatePayload) {
       body: JSON.stringify({
         sku: product.sku?.trim() ? product.sku.trim() : undefined,
         name: product.name,
+        variant: product.variant?.trim() ? product.variant.trim() : null,
+        salesChannel: product.salesChannel,
         brand: product.brand?.trim() ? product.brand.trim() : null,
         inventoryUnit: product.inventoryUnit,
         sellingUnit: product.sellingUnit,

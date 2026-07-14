@@ -91,10 +91,12 @@ export async function listProducts(query: ProductListQuery) {
     status: query.status,
     categoryId: query.categoryId,
     supplierId: query.supplierId,
+    salesChannel: query.salesChannel,
     ...(query.search
       ? {
           OR: [
             { name: { contains: query.search } },
+            { variant: { contains: query.search } },
             { sku: { contains: query.search } },
             { brand: { contains: query.search } },
             { barcodes: { some: { value: { contains: query.search } } } }

@@ -18,13 +18,21 @@ const roleDefinitions: Record<UserRoleInput, { name: string; description: string
       "suppliers.manage",
       "reports.read",
       "settings.manage",
-      "audit.read"
+      "audit.read",
+      "inventory.import",
+      "inventory.import.rollback",
+      "tables.manage",
+      "orders.manage",
+      "orders.cancel",
+      "orders.split-bill",
+      "orders.discount",
+      "orders.reopen"
     ]
   },
   CASHIER: {
     name: "Cashier",
     description: "Can use the POS, search products, and serve customers.",
-    permissions: ["dashboard.read", "sales.manage", "customers.manage"]
+    permissions: ["dashboard.read", "sales.manage", "customers.manage", "orders.manage"]
   }
 };
 

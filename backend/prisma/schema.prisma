@@ -178,6 +178,8 @@ model Product {
   supplierId         String?
   sku                String              @unique
   name               String
+  variant            String?
+  salesChannel       String              @default("RETAIL")
   description        String?
   imageUrl           String?
   brand              String?
@@ -214,6 +216,8 @@ model Product {
   stockAlerts        StockAlert[]
 
   @@index([name])
+  @@index([name, variant])
+  @@index([salesChannel, status])
   @@index([categoryId])
   @@index([supplierId])
   @@index([deletedAt])
@@ -284,6 +288,8 @@ model Sale {
   cashierId     String
   customerId    String?
   receiptNumber String            @unique
+  orderNumber   String?           @unique
+  orderType     String            @default("RETAIL")
   status        String            @default("COMPLETED")
   subtotal      Decimal
   discountTotal Decimal           @default(0)
@@ -291,6 +297,8 @@ model Sale {
   grandTotal    Decimal
   paidTotal     Decimal
   changeTotal   Decimal           @default(0)
+  serviceCharge Decimal           @default(0)
+  tip           Decimal           @default(0)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   deletedAt     DateTime?
@@ -303,6 +311,7 @@ model Sale {
   printLogs     ReceiptPrintLog[]
 
   @@index([storeId, createdAt])
+  @@index([orderType, createdAt])
   @@index([cashierId, createdAt])
   @@index([customerId])
 }

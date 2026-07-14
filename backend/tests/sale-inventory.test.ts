@@ -96,4 +96,30 @@ describe("sale inventory integration", () => {
     expect(mocks.transaction.inventoryMovement.create).not.toHaveBeenCalled();
     expect(mocks.publishRealtimeEvent).not.toHaveBeenCalled();
   });
+
+  it("stores restaurant order metadata and includes service charge and tip in the total", async () => {
+    await createSale(
+      {
+        ...saleInput,
+        orderNumber: "TAKE-0001",
+        orderType: "TAKEOUT",
+        serviceCharge: 10,
+        tip: 5,
+        payments: [{ method: "CASH", amount: 115 }]
+      },
+      actor
+    );
+
+    expect(mocks.transaction.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderNumber: "TAKE-0001",
+          orderType: "TAKEOUT",
+          grandTotal: 115,
+          serviceCharge: 10,
+          tip: 5
+        })
+      })
+    );
+  });
 });

@@ -24,6 +24,8 @@ import { refreshStockAwareViews } from "../lib/realtime";
 const emptyProduct: ProductCreatePayload = {
   sku: "",
   name: "",
+  variant: "",
+  salesChannel: "RETAIL",
   brand: "",
   barcode: "",
   inventoryUnit: "PIECE",
@@ -56,6 +58,8 @@ const importTemplateHeaders = [
   "Name",
   "SKU",
   "Barcode",
+  "Variant",
+  "Product Channel",
   "Brand",
   "Stock Unit",
   "Selling Unit",
@@ -84,6 +88,8 @@ function productToForm(product: Product): ProductCreatePayload {
   return {
     sku: product.sku,
     name: product.name,
+    variant: product.variant ?? "",
+    salesChannel: product.salesChannel,
     brand: product.brand ?? "",
     barcode: product.barcodes.find((barcode) => barcode.isPrimary)?.value ?? product.barcodes[0]?.value ?? "",
     inventoryUnit: product.inventoryUnit,
@@ -133,6 +139,11 @@ function importRowToProduct(row: Record<string, unknown>): ProductImportPayload 
     name: readImportText(row, ["Name", "Product", "Product Name"]),
     sku: readImportText(row, ["SKU", "Sku"]),
     barcode: readImportText(row, ["Barcode", "Bar Code"]),
+    variant: readImportText(row, ["Variant", "Option"]),
+    salesChannel: (() => {
+      const value = readImportText(row, ["Product Channel", "Sales Channel", "Mode"]).toUpperCase();
+      return value === "RESTAURANT" || value === "BOTH" ? value : "RETAIL";
+    })(),
     brand: readImportText(row, ["Brand"]),
     inventoryUnit,
     sellingUnit,
@@ -491,6 +502,26 @@ export function InventoryPage() {
             />
           </label>
           <label className="text-sm font-semibold">
+            Variant
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={product.variant ?? ""}
+              onChange={(event) => setProduct((current) => ({ ...current, variant: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Product channel
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={product.salesChannel}
+              onChange={(event) => setProduct((current) => ({ ...current, salesChannel: event.target.value as ProductCreatePayload["salesChannel"] }))}
+            >
+              <option value="RETAIL">Retail</option>
+              <option value="RESTAURANT">Restaurant</option>
+              <option value="BOTH">Retail and Restaurant</option>
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
             Stock unit
             <select
               className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
@@ -663,6 +694,26 @@ export function InventoryPage() {
               value={editingProduct.brand ?? ""}
               onChange={(event) => setEditingProduct((current) => ({ ...current, brand: event.target.value }))}
             />
+          </label>
+          <label className="text-sm font-semibold">
+            Variant
+            <input
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.variant ?? ""}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, variant: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Product channel
+            <select
+              className="focus-ring mt-2 h-11 w-full rounded-md border border-slate-200 px-3 dark:border-slate-700 dark:bg-slate-800"
+              value={editingProduct.salesChannel}
+              onChange={(event) => setEditingProduct((current) => ({ ...current, salesChannel: event.target.value as ProductCreatePayload["salesChannel"] }))}
+            >
+              <option value="RETAIL">Retail</option>
+              <option value="RESTAURANT">Restaurant</option>
+              <option value="BOTH">Retail and Restaurant</option>
+            </select>
           </label>
           <label className="text-sm font-semibold">
             Stock unit

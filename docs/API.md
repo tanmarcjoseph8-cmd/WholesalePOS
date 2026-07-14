@@ -88,6 +88,8 @@ Supports pagination and filtering with `page`, `pageSize`, `search`, `status`, `
 
 Creates a product with SKU, prices, units, optional supplier/category links, and optional barcodes. The API validates input, writes an audit log, and publishes a local `product:created` update event.
 
+Product payloads may include `variant` and `salesChannel`. `salesChannel` is `RETAIL`, `RESTAURANT`, or `BOTH` and defaults to `RETAIL`.
+
 `GET /products/:id`
 
 Returns product details, barcodes, category, supplier, warehouse stock balances, and recent price history.
@@ -167,6 +169,8 @@ Returns paginated completed sales with cashier, items, and payments.
 
 Completes a sale in one transaction. The API creates a receipt number, sale items, sale payments, stock deductions, inventory movement rows, and an audit log.
 
+Optional restaurant-compatible fields are `orderNumber`, `orderType`, `serviceCharge`, and `tip`. Existing retail requests may omit them; defaults preserve the original checkout behavior.
+
 Request:
 
 ```json
@@ -234,11 +238,13 @@ All settings endpoints require `Authorization: Bearer <accessToken>` and the `se
 
 `GET /settings`
 
-Returns business, tax, receipt, printer, theme, and backup settings with defaults applied.
+Returns business mode, business, tax, receipt, printer, theme, backup, inventory import, and restaurant settings with defaults applied.
 
 `PUT /settings`
 
 Updates settings groups and records an audit log.
+
+Business mode is `RETAIL`, `RESTAURANT`, or `HYBRID`. Inventory import settings include batch size, duplicate-file protection, and the default import mode. Restaurant settings include enabled order types, tables, kitchen tickets, service charge, split billing, partial payments, and order-number format.
 
 `GET /settings/backups`
 

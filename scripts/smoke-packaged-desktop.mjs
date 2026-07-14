@@ -224,7 +224,13 @@ try {
   });
 
   const list = await requestJson(port, "/api/products?pageSize=10", { token: session.accessToken });
-  if (product?.name !== "Smoke Test Product" || product?.sku !== "123456789012" || !Array.isArray(list?.items) || list.items.length !== 1) {
+  if (
+    product?.name !== "Smoke Test Product" ||
+    product?.sku !== "123456789012" ||
+    product?.salesChannel !== "RETAIL" ||
+    !Array.isArray(list?.items) ||
+    list.items.length !== 1
+  ) {
     throw new Error("Packaged product persistence smoke test failed.");
   }
 
@@ -384,6 +390,9 @@ try {
   }
 
   const settings = await requestJson(port, "/api/settings", { token: session.accessToken });
+  if (settings?.businessMode?.mode !== "RETAIL" || settings?.inventoryImport?.batchSize !== 250) {
+    throw new Error("POS mode settings defaults smoke test failed.");
+  }
   const updatedSettings = await requestJson(port, "/api/settings", {
     method: "PUT",
     token: session.accessToken,

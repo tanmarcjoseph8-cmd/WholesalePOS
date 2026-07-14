@@ -18,6 +18,7 @@ const unitTypeSchema = z.enum([
 ]);
 
 const productStatusSchema = z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]);
+const productSalesChannelSchema = z.enum(["RETAIL", "RESTAURANT", "BOTH"]);
 
 const nullableText = z.string().trim().min(1).max(500).optional().nullable();
 const money = z.coerce.number().finite().min(0).max(999_999_999.99);
@@ -31,6 +32,8 @@ const barcodeSchema = z.object({
 export const productCreateSchema = z.object({
   sku: z.string().trim().min(2).max(64).optional(),
   name: z.string().trim().min(2).max(160),
+  variant: z.string().trim().min(1).max(120).optional().nullable(),
+  salesChannel: productSalesChannelSchema.default("RETAIL"),
   description: nullableText,
   imageUrl: z.string().trim().url().optional().nullable(),
   brand: nullableText,
@@ -69,7 +72,8 @@ export const productListQuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
   status: productStatusSchema.optional(),
   categoryId: z.string().trim().min(1).optional(),
-  supplierId: z.string().trim().min(1).optional()
+  supplierId: z.string().trim().min(1).optional(),
+  salesChannel: productSalesChannelSchema.optional()
 });
 
 export const productImportRowSchema = productCreateSchema.extend({

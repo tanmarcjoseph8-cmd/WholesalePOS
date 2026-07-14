@@ -20,7 +20,15 @@ const ownerPermissions = [
   "suppliers.manage",
   "reports.read",
   "settings.manage",
-  "audit.read"
+  "audit.read",
+  "inventory.import",
+  "inventory.import.rollback",
+  "tables.manage",
+  "orders.manage",
+  "orders.cancel",
+  "orders.split-bill",
+  "orders.discount",
+  "orders.reopen"
 ];
 
 type TransactionClient = Prisma.TransactionClient;

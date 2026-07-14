@@ -28,8 +28,10 @@ async function nextReceiptNumber(transaction: Prisma.TransactionClient, storeId:
 
 export async function listSales(query: SaleListQuery) {
   const { page, pageSize, skip, take } = getPagination(query);
+  const where = { orderType: query.orderType };
   const [items, total] = await prisma.$transaction([
     prisma.sale.findMany({
+      where,
       include: {
         cashier: { select: { id: true, name: true, email: true } },
         items: { include: { product: { select: { id: true, name: true, sku: true } } } },
@@ -39,7 +41,7 @@ export async function listSales(query: SaleListQuery) {
       skip,
       take
     }),
-    prisma.sale.count()
+    prisma.sale.count({ where })
   ]);
 
   return buildPaginatedResponse(items, total, page, pageSize);
@@ -50,6 +52,9 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
     throw new AppError(400, "STORE_REQUIRED", "The cashier must belong to a store before selling.");
   }
   const storeId = actor.storeId;
+  const orderType = input.orderType ?? "RETAIL";
+  const serviceCharge = input.serviceCharge ?? 0;
+  const tip = input.tip ?? 0;
 
   const sale = await prisma.$transaction(async (transaction) => {
     const receiptNumber = await nextReceiptNumber(transaction, storeId);
@@ -114,7 +119,7 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
     const subtotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.unitPrice * item.baseQuantity, 0));
     const discountTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.discount, 0));
     const taxTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.taxAmount, 0));
-    const grandTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.lineTotal, 0));
+    const grandTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.lineTotal, 0) + serviceCharge + tip);
     const paidTotal = roundMoney(input.payments.reduce((sum, payment) => sum + payment.amount, 0));
 
     if (paidTotal < grandTotal) {
@@ -127,12 +132,16 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
         cashierId: actor.userId,
         customerId: input.customerId ?? undefined,
         receiptNumber,
+        orderNumber: input.orderNumber ?? undefined,
+        orderType,
         subtotal,
         discountTotal,
         taxTotal,
         grandTotal,
         paidTotal,
         changeTotal: roundMoney(paidTotal - grandTotal),
+        serviceCharge,
+        tip,
         items: {
           create: preparedItems.map((item) => ({
             productId: item.input.productId,
@@ -185,7 +194,16 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
         action: "SALE_COMPLETED",
         entityType: "Sale",
         entityId: sale.id,
-        metadata: { receiptNumber, grandTotal, paidTotal, paymentMethods: input.payments.map((payment) => payment.method) }
+        metadata: {
+          receiptNumber,
+          orderNumber: input.orderNumber,
+          orderType,
+          grandTotal,
+          paidTotal,
+          serviceCharge,
+          tip,
+          paymentMethods: input.payments.map((payment) => payment.method)
+        }
       }
     });
 

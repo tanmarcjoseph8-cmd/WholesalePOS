@@ -19,6 +19,10 @@ const unitTypeSchema = z.enum([
 
 export const saleCreateSchema = z.object({
   customerId: z.string().trim().min(1).optional().nullable(),
+  orderNumber: z.string().trim().min(1).max(80).optional().nullable(),
+  orderType: z.enum(["RETAIL", "DINE_IN", "TAKEOUT", "DELIVERY", "WALK_IN"]).default("RETAIL"),
+  serviceCharge: z.coerce.number().finite().min(0).max(999_999_999.99).default(0),
+  tip: z.coerce.number().finite().min(0).max(999_999_999.99).default(0),
   items: z
     .array(
       z.object({
@@ -44,7 +48,8 @@ export const saleCreateSchema = z.object({
 
 export const saleListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(1000).default(25)
+  pageSize: z.coerce.number().int().positive().max(1000).default(25),
+  orderType: z.enum(["RETAIL", "DINE_IN", "TAKEOUT", "DELIVERY", "WALK_IN"]).optional()
 });
 
 export type SaleCreateInput = z.infer<typeof saleCreateSchema>;
