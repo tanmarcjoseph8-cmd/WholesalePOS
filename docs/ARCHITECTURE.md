@@ -25,6 +25,19 @@ The app must still update immediately on the active device after important actio
 
 Backend services may continue publishing internal realtime events after successful transactions. In the single-device model, these events are used for local UI refresh, logs, and future extensibility rather than cross-device synchronization.
 
+## Inventory Services
+
+The inventory backend keeps `inventory.service.ts` as its stable public facade. Routes, reports, and product imports continue to use that module while implementation responsibilities are separated as follows:
+
+- `inventory-query.service.ts` lists warehouses, live stock balances, search results, and low-stock rows.
+- `stock-movement.service.ts` records stock-in, stock-out, damage, returns, purchase receipts, and movement history.
+- `stock-adjustment.service.ts` reconciles physical counts and records signed adjustment movements.
+- `stock-transfer.service.ts` atomically moves stock between warehouses and records paired transfer movements.
+- `inventory-stock.shared.ts` owns the shared stock include shape, decimal conversion, and product/warehouse validation.
+- `inventory-calculations.ts` remains the shared source for six-decimal stock arithmetic and negative-stock prevention, including the sales integration.
+
+All inventory writes, movement records, and audit records remain grouped in Prisma transactions. Realtime events are published only after those transactions complete.
+
 ## Out Of Scope
 
 The following are no longer required for the current product direction:
