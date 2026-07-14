@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
     product: { findFirst: vi.fn() },
     inventoryStock: { upsert: vi.fn(), update: vi.fn() },
     sale: { create: vi.fn() },
+    heldSale: { findFirst: vi.fn(), updateMany: vi.fn() },
+    restaurantTable: { updateMany: vi.fn() },
     inventoryMovement: { create: vi.fn() },
     auditLog: { create: vi.fn() }
   };
@@ -17,7 +19,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("../src/config/prisma.js", () => ({ prisma: mocks.prisma }));
 vi.mock("../src/realtime/bus.js", () => ({ publishRealtimeEvent: mocks.publishRealtimeEvent }));
 
-import { createSale } from "../src/modules/sales/sale.service.js";
+import { completeHeldSale, createSale } from "../src/modules/sales/sale.service.js";
 
 const actor = { userId: "cashier-1", storeId: "store-1" };
 const saleInput = {
@@ -64,6 +66,8 @@ describe("sale inventory integration", () => {
     mocks.transaction.inventoryStock.update.mockResolvedValue({ id: "stock-1", quantity: 3 });
     mocks.transaction.inventoryMovement.create.mockResolvedValue({ id: "movement-1" });
     mocks.transaction.auditLog.create.mockResolvedValue({ id: "audit-1" });
+    mocks.transaction.heldSale.updateMany.mockResolvedValue({ count: 1 });
+    mocks.transaction.restaurantTable.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it("deducts the base quantity and records the sale movement in the sale transaction", async () => {
@@ -121,5 +125,73 @@ describe("sale inventory integration", () => {
         })
       })
     );
+  });
+
+  it("atomically completes a held restaurant order through the normal sale inventory transaction", async () => {
+    mocks.transaction.heldSale.findFirst.mockResolvedValue({
+      id: "order-1",
+      storeId: "store-1",
+      customerId: null,
+      orderNumber: "DINE-000001",
+      orderType: "DINE_IN",
+      status: "SERVED",
+      version: 4,
+      serviceCharge: 10,
+      tip: 0,
+      lockedByUserId: "cashier-1",
+      lockExpiresAt: new Date(Date.now() + 60_000),
+      completedSale: null,
+      items: [
+        {
+          productId: "product-1",
+          warehouseId: "warehouse-1",
+          quantity: 2,
+          soldUnit: "PIECE",
+          unitPrice: 50,
+          discount: 0
+        }
+      ]
+    });
+
+    await completeHeldSale(
+      "order-1",
+      { expectedVersion: 4, payments: [{ method: "CASH", amount: 110 }] },
+      actor
+    );
+
+    expect(mocks.transaction.sale.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ heldSaleId: "order-1", orderNumber: "DINE-000001", orderType: "DINE_IN" }) })
+    );
+    expect(mocks.transaction.heldSale.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "order-1", version: 4 }),
+        data: expect.objectContaining({ status: "COMPLETED", version: { increment: 1 } })
+      })
+    );
+    expect(mocks.transaction.restaurantTable.updateMany).toHaveBeenCalledWith({
+      where: { activeOrderId: "order-1" },
+      data: { activeOrderId: null, status: "CLEANING", guestCount: 0 }
+    });
+    expect(mocks.transaction.inventoryMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ type: "SALE", quantity: -2, referenceId: "sale-1" }) })
+    );
+  });
+
+  it("rejects checkout when the held order version is stale before creating a sale", async () => {
+    mocks.transaction.heldSale.findFirst.mockResolvedValue({
+      id: "order-1",
+      status: "OPEN",
+      version: 5,
+      completedSale: null,
+      lockedByUserId: null,
+      lockExpiresAt: null,
+      items: []
+    });
+
+    await expect(completeHeldSale("order-1", { expectedVersion: 4, payments: [{ method: "CASH", amount: 100 }] }, actor)).rejects.toThrow(
+      "This order changed"
+    );
+    expect(mocks.transaction.sale.create).not.toHaveBeenCalled();
+    expect(mocks.transaction.inventoryStock.update).not.toHaveBeenCalled();
   });
 });

@@ -16,6 +16,7 @@ import { inventoryImportRouter } from "./modules/inventory-imports/inventory-imp
 import { productRouter } from "./modules/products/product.routes.js";
 import { receiptRouter } from "./modules/receipts/receipt.routes.js";
 import { reportRouter } from "./modules/reports/report.routes.js";
+import { restaurantRouter } from "./modules/restaurant/restaurant.routes.js";
 import { saleRouter } from "./modules/sales/sale.routes.js";
 import { settingRouter } from "./modules/settings/setting.routes.js";
 import { userRouter } from "./modules/users/user.routes.js";
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/products", productRouter);
   app.use("/api/receipts", receiptRouter);
   app.use("/api/reports", reportRouter);
+  app.use("/api/restaurant", restaurantRouter);
   app.use("/api/sales", saleRouter);
   app.use("/api/settings", settingRouter);
   app.use("/api/users", userRouter);

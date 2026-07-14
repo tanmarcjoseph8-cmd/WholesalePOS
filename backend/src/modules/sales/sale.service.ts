@@ -8,6 +8,7 @@ import type { Actor } from "../auth/actor.js";
 import { calculateNextStock } from "../inventory/inventory-calculations.js";
 import { calculateVariableSaleLine, type UnitCode } from "../inventory/unit-conversion.js";
 import type { SaleCreateInput, SaleListQuery } from "./sale.schemas.js";
+import { nextSequenceNumber } from "./numbering.service.js";
 
 function toNumber(value: Prisma.Decimal | number) {
   return Number(value);
@@ -15,15 +16,6 @@ function toNumber(value: Prisma.Decimal | number) {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
-}
-
-async function nextReceiptNumber(transaction: Prisma.TransactionClient, storeId: string) {
-  const sequence = await transaction.receiptSequence.upsert({
-    where: { storeId_prefix: { storeId, prefix: "POS" } },
-    update: { nextNumber: { increment: 1 } },
-    create: { storeId, prefix: "POS", nextNumber: 2, padding: 6 }
-  });
-  return `${sequence.prefix}-${String(sequence.nextNumber - 1).padStart(sequence.padding, "0")}`;
 }
 
 export async function listSales(query: SaleListQuery) {
@@ -47,20 +39,59 @@ export async function listSales(query: SaleListQuery) {
   return buildPaginatedResponse(items, total, page, pageSize);
 }
 
-export async function createSale(input: SaleCreateInput, actor: Actor) {
+type HeldSaleCheckoutInput = Pick<SaleCreateInput, "payments"> & {
+  expectedVersion: number;
+  serviceCharge?: number;
+  tip?: number;
+};
+
+async function checkoutSale(input: SaleCreateInput | null, actor: Actor, heldSale?: { id: string; checkout: HeldSaleCheckoutInput }) {
   if (!actor.storeId) {
     throw new AppError(400, "STORE_REQUIRED", "The cashier must belong to a store before selling.");
   }
   const storeId = actor.storeId;
-  const orderType = input.orderType ?? "RETAIL";
-  const serviceCharge = input.serviceCharge ?? 0;
-  const tip = input.tip ?? 0;
 
   const sale = await prisma.$transaction(async (transaction) => {
-    const receiptNumber = await nextReceiptNumber(transaction, storeId);
+    let checkoutInput = input;
+    if (heldSale) {
+      const order = await transaction.heldSale.findFirst({
+        where: { id: heldSale.id, storeId, deletedAt: null },
+        include: { items: { where: { deletedAt: null } }, completedSale: { select: { id: true } } }
+      });
+      if (!order) throw new AppError(404, "ORDER_NOT_FOUND", "Restaurant order was not found.");
+      if (order.completedSale || order.status === "COMPLETED") throw new AppError(409, "ORDER_ALREADY_COMPLETED", "This order has already been paid.");
+      if (order.status === "CANCELLED") throw new AppError(409, "ORDER_CANCELLED", "Cancelled orders must be reopened before checkout.");
+      if (order.version !== heldSale.checkout.expectedVersion) throw new AppError(409, "ORDER_VERSION_CONFLICT", "This order changed. Reload it before checkout.");
+      if (order.lockedByUserId && order.lockedByUserId !== actor.userId && order.lockExpiresAt && order.lockExpiresAt > new Date()) {
+        throw new AppError(409, "ORDER_LOCKED", "Another employee is editing this order.");
+      }
+      if (!order.items.length) throw new AppError(400, "ORDER_EMPTY", "Add at least one item before checkout.");
+      if (order.items.some((item) => !item.warehouseId)) throw new AppError(409, "ORDER_WAREHOUSE_REQUIRED", "Every order item must have a warehouse before checkout.");
+      checkoutInput = {
+        customerId: order.customerId,
+        orderNumber: order.orderNumber,
+        orderType: order.orderType as SaleCreateInput["orderType"],
+        serviceCharge: heldSale.checkout.serviceCharge ?? toNumber(order.serviceCharge),
+        tip: heldSale.checkout.tip ?? toNumber(order.tip),
+        items: order.items.map((item) => ({
+          productId: item.productId,
+          warehouseId: item.warehouseId as string,
+          quantity: toNumber(item.quantity),
+          soldUnit: item.soldUnit as UnitCode,
+          unitPrice: toNumber(item.unitPrice),
+          discount: toNumber(item.discount)
+        })),
+        payments: heldSale.checkout.payments
+      };
+    }
+    if (!checkoutInput) throw new AppError(400, "SALE_INPUT_REQUIRED", "Sale details are required.");
+    const orderType = checkoutInput.orderType ?? "RETAIL";
+    const serviceCharge = checkoutInput.serviceCharge ?? 0;
+    const tip = checkoutInput.tip ?? 0;
+    const receiptNumber = await nextSequenceNumber(transaction, storeId, "POS");
     const preparedItems = [];
 
-    for (const item of input.items) {
+    for (const item of checkoutInput.items) {
       const product = await transaction.product.findFirst({
         where: { id: item.productId, deletedAt: null, status: "ACTIVE" },
         select: {
@@ -120,7 +151,7 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
     const discountTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.discount, 0));
     const taxTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.taxAmount, 0));
     const grandTotal = roundMoney(preparedItems.reduce((sum, item) => sum + item.lineTotal, 0) + serviceCharge + tip);
-    const paidTotal = roundMoney(input.payments.reduce((sum, payment) => sum + payment.amount, 0));
+    const paidTotal = roundMoney(checkoutInput.payments.reduce((sum, payment) => sum + payment.amount, 0));
 
     if (paidTotal < grandTotal) {
       throw new AppError(400, "PAYMENT_INSUFFICIENT", "Payment total is less than the sale total.");
@@ -130,9 +161,10 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
       data: {
         storeId,
         cashierId: actor.userId,
-        customerId: input.customerId ?? undefined,
+        customerId: checkoutInput.customerId ?? undefined,
+        heldSaleId: heldSale?.id,
         receiptNumber,
-        orderNumber: input.orderNumber ?? undefined,
+        orderNumber: checkoutInput.orderNumber ?? undefined,
         orderType,
         subtotal,
         discountTotal,
@@ -156,7 +188,7 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
           }))
         },
         payments: {
-          create: input.payments.map((payment) => ({
+          create: checkoutInput.payments.map((payment) => ({
             method: payment.method,
             amount: payment.amount,
             reference: payment.reference
@@ -196,16 +228,36 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
         entityId: sale.id,
         metadata: {
           receiptNumber,
-          orderNumber: input.orderNumber,
+          orderNumber: checkoutInput.orderNumber,
           orderType,
           grandTotal,
           paidTotal,
           serviceCharge,
           tip,
-          paymentMethods: input.payments.map((payment) => payment.method)
+          paymentMethods: checkoutInput.payments.map((payment) => payment.method)
         }
       }
     });
+
+    if (heldSale) {
+      const completed = await transaction.heldSale.updateMany({
+        where: { id: heldSale.id, version: heldSale.checkout.expectedVersion, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+        data: {
+          status: "COMPLETED",
+          serviceCharge,
+          tip,
+          completedAt: new Date(),
+          lockedByUserId: null,
+          lockExpiresAt: null,
+          version: { increment: 1 }
+        }
+      });
+      if (!completed.count) throw new AppError(409, "ORDER_VERSION_CONFLICT", "This order changed during checkout.");
+      await transaction.restaurantTable.updateMany({
+        where: { activeOrderId: heldSale.id },
+        data: { activeOrderId: null, status: "CLEANING", guestCount: 0 }
+      });
+    }
 
     return sale;
   });
@@ -225,4 +277,12 @@ export async function createSale(input: SaleCreateInput, actor: Actor) {
   });
 
   return sale;
+}
+
+export async function createSale(input: SaleCreateInput, actor: Actor) {
+  return checkoutSale(input, actor);
+}
+
+export async function completeHeldSale(id: string, input: HeldSaleCheckoutInput, actor: Actor) {
+  return checkoutSale(null, actor, { id, checkout: input });
 }

@@ -90,7 +90,7 @@ describe("inventory routes", () => {
 
   it("serves warehouse, stock, and movement queries with their existing response status", async () => {
     const warehouses = await request("/api/inventory/warehouses", {}, "sales.manage");
-    const stock = await request("/api/inventory/stock?page=1&pageSize=25", {}, "sales.manage");
+    const stock = await request("/api/inventory/stock?page=1&pageSize=25&lowStockOnly=false", {}, "sales.manage");
     const movements = await request("/api/inventory/movements?page=1&pageSize=25");
 
     expect(warehouses.status).toBe(200);

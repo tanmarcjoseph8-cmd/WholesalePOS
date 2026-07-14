@@ -38,7 +38,9 @@ export const inventoryListQuerySchema = z.object({
   productId: z.string().trim().min(1).optional(),
   warehouseId: z.string().trim().min(1).optional(),
   search: z.string().trim().max(120).optional(),
-  lowStockOnly: z.coerce.boolean().default(false)
+  lowStockOnly: z
+    .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
+    .default(false)
 });
 
 export const movementListQuerySchema = z.object({

@@ -237,6 +237,33 @@ Request:
 
 For variable quantity selling, `quantity` is the amount entered by the cashier in `soldUnit`. The backend converts it to the product inventory unit, saves both the entered quantity and base stock quantity, calculates the package-based price, and deducts the converted stock amount. For example, a 5kg product priced at ₱300 can be sold as `2500` `GRAM`; the sale line totals ₱150 and deducts 2.5kg.
 
+## Restaurant Operations
+
+Restaurant endpoints require authentication, Restaurant or Hybrid business mode, and the stated permission. The runtime mode and restaurant feature flags are available to any signed-in user from `GET /settings/runtime`.
+
+### Tables
+
+- `GET /restaurant/tables` requires `orders.manage` and returns active tables with status, assigned employee, and active order.
+- `POST /restaurant/tables` requires `tables.manage` and creates a table.
+- `PATCH /restaurant/tables/:id` requires `tables.manage` and updates table details or status.
+- `DELETE /restaurant/tables/:id` requires `tables.manage` and soft-disables an unused table.
+
+Table statuses are `AVAILABLE`, `OCCUPIED`, `RESERVED`, `AWAITING_ORDER`, `PREPARING`, `SERVED`, `AWAITING_PAYMENT`, and `CLEANING`. Assigning several tables to one active order joins them without duplicating the order.
+
+### Active Orders
+
+- `GET /restaurant/orders` lists active orders; `includeClosed=true` includes completed and cancelled history.
+- `POST /restaurant/orders` creates a dine-in, walk-in, counter, takeout, pickup, or delivery order.
+- `PATCH /restaurant/orders/:id` updates customer details, notes, items, quantities, discounts, and status using `expectedVersion`.
+- `POST /restaurant/orders/:id/lock` acquires or renews a two-minute employee edit lease.
+- `DELETE /restaurant/orders/:id/lock` releases the caller's edit lease and holds the order for later.
+- `PUT /restaurant/orders/:id/tables` moves or joins tables.
+- `POST /restaurant/orders/:id/cancel` requires `orders.cancel`; cancellation is audited and retained.
+- `POST /restaurant/orders/:id/reopen` requires `orders.reopen` and reopens an unpaid cancelled order.
+- `POST /restaurant/orders/:id/checkout` requires `sales.manage` and completes payment.
+
+Checkout re-reads and version-checks the held order inside the existing sale transaction. The same transaction creates `Sale`, `SaleItem`, `SalePayment`, stock deductions, `InventoryMovement`, and audit records, marks the held order complete, and moves assigned tables to cleaning. A unique held-sale link rejects repeated checkout instead of deducting stock twice.
+
 ## Receipts
 
 All receipt endpoints require `Authorization: Bearer <accessToken>` and the `sales.manage` permission.

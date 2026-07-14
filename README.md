@@ -9,6 +9,7 @@ The app now supports a practical single-device POS workflow:
 - First-run owner setup, secure login, roles, and protected screens.
 - Product, inventory, stock adjustment, stock history, and low-stock controls.
 - Advanced Excel/CSV inventory import with drag and drop, spreadsheet paste, manual grid entry, column mapping presets, backend preview, batch history, reports, duplicate protection, and safe rollback.
+- Optional Restaurant and Hybrid modes with table status, joined tables, walk-in/takeout/pickup/delivery orders, held orders, employee edit locks, item notes, and atomic checkout through the same stock ledger as Retail POS.
 - Low-stock reorder list with suggested reorder quantities.
 - POS checkout with barcode/search input, decimal quantities, cash, GCash, and mixed payments.
 - Variable quantity selling such as grams from kilogram stock, milliliters from liter stock, or yards from meter stock.
@@ -68,6 +69,8 @@ pnpm desktop:package:win
 The desktop app stores its day-to-day database under the user's application data folder, not in the Git repository.
 
 On a fresh desktop install, the app opens to an owner setup screen. Create the owner account there, then use Inventory, POS, Reports, and Settings. Products, sales, stock, receipts, settings, and backups are saved locally and remain after the app is closed.
+
+To use restaurant operations, open Settings, choose `Restaurant` or `Hybrid`, save, and open Restaurant from the navigation. Products intended for that workspace must use the `Restaurant` or `Both` sales channel.
 
 ## Verification
 

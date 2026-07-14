@@ -66,6 +66,7 @@ const productSchema = z.object({
   costPrice: z.coerce.number(),
   wholesaleThreshold: z.coerce.number(),
   minimumStock: z.coerce.number(),
+  taxRate: z.coerce.number(),
   status: z.string(),
   barcodes: z.array(z.object({ id: z.string(), value: z.string(), isPrimary: z.boolean() })).default([]),
   stocks: z
@@ -131,7 +132,7 @@ const saleSummarySchema = z.object({
   id: z.string(),
   receiptNumber: z.string(),
   orderNumber: z.string().nullable().optional(),
-  orderType: z.enum(["RETAIL", "DINE_IN", "TAKEOUT", "DELIVERY", "WALK_IN"]).optional(),
+  orderType: z.enum(["RETAIL", "DINE_IN", "TAKEOUT", "DELIVERY", "WALK_IN", "COUNTER", "PICKUP"]).optional(),
   grandTotal: z.coerce.number(),
   paidTotal: z.coerce.number(),
   changeTotal: z.coerce.number()
@@ -339,6 +340,73 @@ const inventoryImportPresetSchema = z.object({
   createdAt: z.string()
 });
 
+const runtimeSettingsSchema = appSettingsSchema.pick({ businessMode: true, restaurant: true });
+
+const restaurantTableSchema = z.object({
+  id: z.string(),
+  number: z.string(),
+  section: z.string(),
+  capacity: z.number(),
+  status: z.enum(["AVAILABLE", "OCCUPIED", "RESERVED", "AWAITING_ORDER", "PREPARING", "SERVED", "AWAITING_PAYMENT", "CLEANING"]),
+  guestCount: z.number(),
+  occupiedAt: z.string().nullable(),
+  notes: z.string().nullable(),
+  isActive: z.boolean(),
+  assignedStaff: z.object({ id: z.string(), name: z.string() }).nullable(),
+  activeOrder: z
+    .object({ id: z.string(), orderNumber: z.string().nullable(), orderType: z.string(), status: z.string(), guestCount: z.number(), version: z.number(), updatedAt: z.string() })
+    .nullable()
+});
+
+const restaurantOrderItemSchema = z.object({
+  id: z.string(),
+  productId: z.string(),
+  warehouseId: z.string().nullable(),
+  quantity: z.coerce.number(),
+  soldUnit: z.string(),
+  baseQuantity: z.coerce.number(),
+  unitPrice: z.coerce.number(),
+  discount: z.coerce.number(),
+  taxAmount: z.coerce.number(),
+  lineTotal: z.coerce.number(),
+  note: z.string().nullable(),
+  product: z.object({ id: z.string(), sku: z.string(), name: z.string(), variant: z.string().nullable(), inventoryUnit: z.string(), sellingUnit: z.string(), taxRate: z.coerce.number() })
+});
+
+const restaurantOrderSchema = z.object({
+  id: z.string(),
+  orderNumber: z.string().nullable(),
+  orderType: z.enum(["DINE_IN", "WALK_IN", "COUNTER", "TAKEOUT", "PICKUP", "DELIVERY"]),
+  status: z.enum(["DRAFT", "OPEN", "PREPARING", "READY", "SERVED", "PAID", "COMPLETED", "CANCELLED"]),
+  customerId: z.string().nullable(),
+  customerName: z.string().nullable(),
+  customerPhone: z.string().nullable(),
+  queueNumber: z.string().nullable(),
+  guestCount: z.number(),
+  note: z.string().nullable(),
+  subtotal: z.coerce.number(),
+  discountTotal: z.coerce.number(),
+  taxTotal: z.coerce.number(),
+  grandTotal: z.coerce.number(),
+  serviceCharge: z.coerce.number(),
+  tip: z.coerce.number(),
+  version: z.number(),
+  lockExpiresAt: z.string().nullable(),
+  cancelReason: z.string().nullable(),
+  updatedAt: z.string(),
+  cashier: z.object({ id: z.string(), name: z.string() }),
+  primaryTable: z.object({ id: z.string(), number: z.string(), section: z.string() }).nullable(),
+  assignedTables: z.array(z.object({ id: z.string(), number: z.string(), section: z.string(), status: z.string() })),
+  lockedBy: z.object({ id: z.string(), name: z.string() }).nullable(),
+  completedSale: z.object({ id: z.string(), receiptNumber: z.string() }).nullable(),
+  items: z.array(restaurantOrderItemSchema)
+});
+
+const restaurantOrderListSchema = z.object({
+  items: z.array(restaurantOrderSchema),
+  pagination: z.object({ page: z.number(), pageSize: z.number(), total: z.number(), totalPages: z.number() })
+});
+
 export type AuthSession = z.infer<typeof authSessionSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type ManagedUser = z.infer<typeof managedUserSchema>;
@@ -352,6 +420,20 @@ export type ReportOverview = z.infer<typeof reportOverviewSchema>;
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "custom";
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type BackupRun = z.infer<typeof backupRunSchema>;
+export type RuntimeSettings = z.infer<typeof runtimeSettingsSchema>;
+export type RestaurantTable = z.infer<typeof restaurantTableSchema>;
+export type RestaurantOrder = z.infer<typeof restaurantOrderSchema>;
+export type RestaurantOrderType = RestaurantOrder["orderType"];
+export type RestaurantOrderStatus = RestaurantOrder["status"];
+export type RestaurantOrderItemInput = {
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  soldUnit?: string;
+  unitPrice?: number;
+  discount: number;
+  note?: string | null;
+};
 
 export type ProductCreatePayload = {
   sku?: string | null;
@@ -599,7 +681,7 @@ export async function createSale(input: {
   items: Array<{ productId: string; warehouseId: string; quantity: number; soldUnit?: string; unitPrice?: number; discount: number }>;
   payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
   orderNumber?: string | null;
-  orderType?: "RETAIL" | "DINE_IN" | "TAKEOUT" | "DELIVERY" | "WALK_IN";
+  orderType?: "RETAIL" | "DINE_IN" | "TAKEOUT" | "DELIVERY" | "WALK_IN" | "COUNTER" | "PICKUP";
   serviceCharge?: number;
   tip?: number;
 }) {
@@ -650,6 +732,100 @@ export async function exportReport(input: { period: ReportPeriod; format: "pdf" 
 
 export async function fetchSettings() {
   return appSettingsSchema.parse(await apiRequest("/api/settings"));
+}
+
+export async function fetchRuntimeSettings() {
+  return runtimeSettingsSchema.parse(await apiRequest("/api/settings/runtime"));
+}
+
+export async function fetchRestaurantTables(includeInactive = false) {
+  return z.array(restaurantTableSchema).parse(await apiRequest(`/api/restaurant/tables?includeInactive=${includeInactive}`));
+}
+
+export async function createRestaurantTable(input: { number: string; section: string; capacity: number; notes?: string | null }) {
+  return restaurantTableSchema.parse(await apiRequest("/api/restaurant/tables", { method: "POST", body: JSON.stringify(input) }));
+}
+
+export async function updateRestaurantTable(input: { id: string; number?: string; section?: string; capacity?: number; status?: RestaurantTable["status"]; notes?: string | null; isActive?: boolean }) {
+  const { id, ...body } = input;
+  return restaurantTableSchema.parse(await apiRequest(`/api/restaurant/tables/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
+}
+
+export async function disableRestaurantTable(id: string) {
+  return restaurantTableSchema.parse(await apiRequest(`/api/restaurant/tables/${id}`, { method: "DELETE" }));
+}
+
+export async function fetchRestaurantOrders(input: { search?: string; includeClosed?: boolean } = {}) {
+  const query = new URLSearchParams({ pageSize: "200", includeClosed: String(input.includeClosed ?? false) });
+  if (input.search?.trim()) query.set("search", input.search.trim());
+  return restaurantOrderListSchema.parse(await apiRequest(`/api/restaurant/orders?${query.toString()}`));
+}
+
+export async function createRestaurantOrder(input: {
+  orderType: RestaurantOrderType;
+  primaryTableId?: string | null;
+  tableIds?: string[];
+  customerName?: string | null;
+  customerPhone?: string | null;
+  queueNumber?: string | null;
+  guestCount: number;
+  note?: string | null;
+  serviceCharge?: number;
+  tip?: number;
+  items?: RestaurantOrderItemInput[];
+}) {
+  return restaurantOrderSchema.parse(await apiRequest("/api/restaurant/orders", { method: "POST", body: JSON.stringify(input) }));
+}
+
+export async function acquireRestaurantOrderLock(id: string, expectedVersion?: number) {
+  return restaurantOrderSchema.parse(await apiRequest(`/api/restaurant/orders/${id}/lock`, { method: "POST", body: JSON.stringify({ expectedVersion }) }));
+}
+
+export async function releaseRestaurantOrderLock(id: string) {
+  return z.object({ released: z.boolean() }).parse(await apiRequest(`/api/restaurant/orders/${id}/lock`, { method: "DELETE" }));
+}
+
+export async function updateRestaurantOrder(input: {
+  id: string;
+  expectedVersion: number;
+  status?: RestaurantOrderStatus;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  queueNumber?: string | null;
+  guestCount?: number;
+  note?: string | null;
+  serviceCharge?: number;
+  tip?: number;
+  items?: RestaurantOrderItemInput[];
+}) {
+  const { id, ...body } = input;
+  return restaurantOrderSchema.parse(await apiRequest(`/api/restaurant/orders/${id}`, { method: "PATCH", body: JSON.stringify(body) }));
+}
+
+export async function assignRestaurantOrderTables(input: { id: string; expectedVersion: number; tableIds: string[]; primaryTableId: string }) {
+  const { id, ...body } = input;
+  return restaurantOrderSchema.parse(await apiRequest(`/api/restaurant/orders/${id}/tables`, { method: "PUT", body: JSON.stringify(body) }));
+}
+
+export async function cancelRestaurantOrder(input: { id: string; expectedVersion: number; reason: string }) {
+  const { id, ...body } = input;
+  return restaurantOrderSchema.parse(await apiRequest(`/api/restaurant/orders/${id}/cancel`, { method: "POST", body: JSON.stringify(body) }));
+}
+
+export async function reopenRestaurantOrder(input: { id: string; expectedVersion: number }) {
+  const { id, ...body } = input;
+  return restaurantOrderSchema.parse(await apiRequest(`/api/restaurant/orders/${id}/reopen`, { method: "POST", body: JSON.stringify(body) }));
+}
+
+export async function checkoutRestaurantOrder(input: {
+  id: string;
+  expectedVersion: number;
+  serviceCharge?: number;
+  tip?: number;
+  payments: Array<{ method: "CASH" | "GCASH"; amount: number; reference?: string | null }>;
+}) {
+  const { id, ...body } = input;
+  return saleSummarySchema.passthrough().parse(await apiRequest(`/api/restaurant/orders/${id}/checkout`, { method: "POST", body: JSON.stringify(body) }));
 }
 
 export async function updateSettings(input: AppSettings) {

@@ -13,6 +13,7 @@ export async function refreshStockAwareViews(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ["warehouses"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["inventory-movements"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["reports"], refetchType }),
+    queryClient.invalidateQueries({ queryKey: ["restaurant"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["notifications"], refetchType }),
     queryClient.invalidateQueries({ queryKey: ["api-health"], refetchType })
   ]);
@@ -30,10 +31,18 @@ export function connectRealtimeUpdates(queryClient: QueryClient) {
     });
   }
 
+  socket.on("restaurant:changed", () => {
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["restaurant"], refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: ["runtime-settings"], refetchType: "all" })
+    ]);
+  });
+
   return () => {
     for (const eventName of stockRefreshEvents) {
       socket.off(eventName);
     }
+    socket.off("restaurant:changed");
     socket.disconnect();
   };
 }

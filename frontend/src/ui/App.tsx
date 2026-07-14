@@ -1,4 +1,4 @@
-import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, RefreshCw, Search, Settings, Sun, Users } from "lucide-react";
+import { Bell, Boxes, ChartNoAxesCombined, Moon, ReceiptText, RefreshCw, Search, Settings, Sun, Users, Utensils } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { connectRealtimeUpdates, refreshStockAwareViews } from "../lib/realtime"
 import {
   clearSession,
   fetchCurrentUser,
+  fetchRuntimeSettings,
   fetchSetupStatus,
   fetchStock,
   loadSession,
@@ -23,6 +24,7 @@ import {
 } from "../lib/api";
 
 const InventoryPage = lazy(() => import("../views/InventoryPage").then((module) => ({ default: module.InventoryPage })));
+const RestaurantPage = lazy(() => import("../views/RestaurantPage").then((module) => ({ default: module.RestaurantPage })));
 
 function InventoryPageLoader() {
   return (
@@ -37,6 +39,7 @@ function InventoryPageLoader() {
 const navItems = [
   { to: "/", label: "Dashboard", icon: ChartNoAxesCombined },
   { to: "/pos", label: "POS", icon: ReceiptText, permission: "sales.manage" },
+  { to: "/restaurant", label: "Restaurant", icon: Utensils, permission: "orders.manage", restaurantOnly: true },
   { to: "/inventory", label: "Inventory", icon: Boxes, permission: "products.manage" },
   { to: "/reports", label: "Reports", icon: ChartNoAxesCombined, permission: "sales.manage" },
   { to: "/settings", label: "Settings", icon: Settings, permission: "settings.manage" },
@@ -222,6 +225,7 @@ export function App() {
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>(() => loadNotificationIds(dismissedNotificationsKey));
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => loadNotificationIds(readNotificationsKey));
   const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser, enabled: Boolean(session) });
+  const runtimeSettings = useQuery({ queryKey: ["runtime-settings"], queryFn: fetchRuntimeSettings, enabled: Boolean(session) });
   const health = useApiHealth();
   const notificationStock = useQuery({ queryKey: ["notifications", "low-stock"], queryFn: () => fetchStock("", true), enabled: Boolean(session) });
   const statusLabel = useMemo(() => {
@@ -316,7 +320,8 @@ export function App() {
   }
 
   const permissions = currentUser.data?.permissions ?? [];
-  const visibleNavItems = navItems.filter((item) => !item.permission || permissions.includes(item.permission));
+  const restaurantEnabled = runtimeSettings.data?.businessMode.mode === "RESTAURANT" || runtimeSettings.data?.businessMode.mode === "HYBRID";
+  const visibleNavItems = navItems.filter((item) => (!item.permission || permissions.includes(item.permission)) && (!item.restaurantOnly || restaurantEnabled));
   const canUseSales = permissions.includes("sales.manage");
   const canManageProducts = permissions.includes("products.manage");
   const canManageUsers = permissions.includes("users.manage");
@@ -353,7 +358,7 @@ export function App() {
       <div className="lg:pl-72">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:px-6">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-0 flex-1">
+            <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 aria-label="Search products, receipts, customers, or suppliers"
@@ -432,10 +437,40 @@ export function App() {
           </div>
         </header>
 
+        <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900 lg:hidden" aria-label="Mobile navigation">
+          {visibleNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                [
+                  "focus-ring inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold",
+                  isActive ? "bg-ocean text-white" : "text-slate-700 dark:text-slate-200"
+                ].join(" ")
+              }
+            >
+              <item.icon aria-hidden="true" size={17} />
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+
         <main className="px-4 py-6 sm:px-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/pos" element={canUseSales ? <PosPage /> : <DashboardPage />} />
+            <Route
+              path="/restaurant"
+              element={
+                canUseSales && restaurantEnabled && permissions.includes("orders.manage") ? (
+                  <Suspense fallback={<InventoryPageLoader />}>
+                    <RestaurantPage permissions={permissions} />
+                  </Suspense>
+                ) : (
+                  <DashboardPage />
+                )
+              }
+            />
             <Route
               path="/inventory"
               element={

@@ -29,6 +29,7 @@ model Store {
   cashDrawerSessions CashDrawerSession[]
   inventoryImports   InventoryImportBatch[]
   importPresets      InventoryImportPreset[]
+  restaurantTables   RestaurantTable[]
 
   @@index([deletedAt])
 }
@@ -106,6 +107,8 @@ model User {
   createdImports      InventoryImportBatch[]  @relation("InventoryImportCreator")
   rolledBackImports   InventoryImportBatch[]  @relation("InventoryImportRollbackUser")
   importPresets       InventoryImportPreset[] @relation("InventoryImportPresetCreator")
+  assignedTables      RestaurantTable[]       @relation("RestaurantTableStaff")
+  lockedHeldSales     HeldSale[]              @relation("HeldSaleLockOwner")
 
   @@index([storeId, deletedAt])
   @@index([roleId])
@@ -374,6 +377,7 @@ model Sale {
   storeId       String
   cashierId     String
   customerId    String?
+  heldSaleId    String?           @unique
   receiptNumber String            @unique
   orderNumber   String?           @unique
   orderType     String            @default("RETAIL")
@@ -392,6 +396,7 @@ model Sale {
   store         Store             @relation(fields: [storeId], references: [id])
   cashier       User              @relation("CashierSales", fields: [cashierId], references: [id])
   customer      Customer?         @relation(fields: [customerId], references: [id])
+  heldSale      HeldSale?         @relation("HeldSaleCompletion", fields: [heldSaleId], references: [id])
   items         SaleItem[]
   payments      SalePayment[]
   refunds       Refund[]          @relation("OriginalSaleRefunds")
@@ -483,45 +488,104 @@ model ReceiptPrintLog {
 }
 
 model HeldSale {
-  id            String         @id @default(cuid())
-  storeId       String
-  cashierId     String
-  customerId    String?
-  label         String?
-  note          String?
-  subtotal      Decimal        @default(0)
-  discountTotal Decimal        @default(0)
-  taxTotal      Decimal        @default(0)
-  grandTotal    Decimal        @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  expiresAt     DateTime?
-  deletedAt     DateTime?
-  store         Store          @relation(fields: [storeId], references: [id])
-  cashier       User           @relation("HeldSaleCashier", fields: [cashierId], references: [id])
-  customer      Customer?      @relation(fields: [customerId], references: [id])
-  items         HeldSaleItem[]
+  id             String            @id @default(cuid())
+  storeId        String
+  cashierId      String
+  customerId     String?
+  primaryTableId String?
+  lockedByUserId String?
+  orderNumber    String?           @unique
+  orderType      String            @default("WALK_IN")
+  status         String            @default("DRAFT")
+  label          String?
+  customerName   String?
+  customerPhone  String?
+  queueNumber    String?
+  guestCount     Int               @default(1)
+  note           String?
+  subtotal       Decimal           @default(0)
+  discountTotal  Decimal           @default(0)
+  taxTotal       Decimal           @default(0)
+  grandTotal     Decimal           @default(0)
+  serviceCharge  Decimal           @default(0)
+  tip            Decimal           @default(0)
+  version        Int               @default(1)
+  lockExpiresAt  DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  reopenedAt     DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  expiresAt      DateTime?
+  deletedAt      DateTime?
+  store          Store             @relation(fields: [storeId], references: [id])
+  cashier        User              @relation("HeldSaleCashier", fields: [cashierId], references: [id])
+  customer       Customer?         @relation(fields: [customerId], references: [id])
+  primaryTable   RestaurantTable?  @relation("PrimaryRestaurantTable", fields: [primaryTableId], references: [id])
+  assignedTables RestaurantTable[] @relation("ActiveOrderTables")
+  lockedBy       User?             @relation("HeldSaleLockOwner", fields: [lockedByUserId], references: [id])
+  completedSale  Sale?             @relation("HeldSaleCompletion")
+  items          HeldSaleItem[]
 
   @@index([storeId, updatedAt])
+  @@index([storeId, status, updatedAt])
   @@index([cashierId, updatedAt])
+  @@index([primaryTableId])
+  @@index([lockedByUserId, lockExpiresAt])
   @@index([deletedAt])
 }
 
 model HeldSaleItem {
-  id         String   @id @default(cuid())
-  heldSaleId String
-  productId  String
-  quantity   Decimal
-  unitPrice  Decimal
-  discount   Decimal  @default(0)
-  taxAmount  Decimal  @default(0)
-  lineTotal  Decimal
-  createdAt  DateTime @default(now())
-  heldSale   HeldSale @relation(fields: [heldSaleId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
+  id           String   @id @default(cuid())
+  heldSaleId   String
+  productId    String
+  warehouseId  String?
+  quantity     Decimal
+  soldUnit     String   @default("PIECE")
+  baseQuantity Decimal  @default(1)
+  unitPrice    Decimal
+  discount     Decimal  @default(0)
+  taxAmount    Decimal  @default(0)
+  lineTotal    Decimal
+  note         String?
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+  heldSale     HeldSale @relation(fields: [heldSaleId], references: [id])
+  product      Product  @relation(fields: [productId], references: [id])
 
   @@index([heldSaleId])
   @@index([productId])
+  @@index([warehouseId])
+  @@index([heldSaleId, deletedAt])
+}
+
+model RestaurantTable {
+  id              String     @id @default(cuid())
+  storeId         String
+  assignedStaffId String?
+  activeOrderId   String?
+  number          String
+  section         String     @default("Main")
+  capacity        Int        @default(2)
+  status          String     @default("AVAILABLE")
+  guestCount      Int        @default(0)
+  occupiedAt      DateTime?
+  notes           String?
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+  store           Store      @relation(fields: [storeId], references: [id])
+  assignedStaff   User?      @relation("RestaurantTableStaff", fields: [assignedStaffId], references: [id])
+  activeOrder     HeldSale?  @relation("ActiveOrderTables", fields: [activeOrderId], references: [id])
+  primaryOrders   HeldSale[] @relation("PrimaryRestaurantTable")
+
+  @@unique([storeId, number])
+  @@index([storeId, section, status])
+  @@index([activeOrderId])
+  @@index([assignedStaffId])
+  @@index([deletedAt])
 }
 
 model Refund {

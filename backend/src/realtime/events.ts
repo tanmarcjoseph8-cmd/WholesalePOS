@@ -7,7 +7,8 @@ export const realtimeEvents = {
   priceChanged: "price:changed",
   customerChanged: "customer:changed",
   supplierChanged: "supplier:changed",
-  purchaseOrderCompleted: "purchase-order:completed"
+  purchaseOrderCompleted: "purchase-order:completed",
+  restaurantChanged: "restaurant:changed"
 } as const;
 
 export type RealtimeEventName = (typeof realtimeEvents)[keyof typeof realtimeEvents];

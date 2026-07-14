@@ -1,5 +1,7 @@
 # Administrator Manual
 
+For Restaurant or Hybrid deployments, configure business mode and feature flags in Settings, assign restaurant permissions by role, and use [Restaurant Operations](RESTAURANT_OPERATIONS.md) for table and order administration.
+
 Administrators manage business profile settings, stores, warehouses, users, roles, permissions, taxes, receipt settings, backups, and audit review.
 
 Security-sensitive actions are recorded in the audit log.

@@ -65,6 +65,17 @@ Confirmed rows run in configurable transaction batches. A failed batch is retrie
 
 Rollback never deletes operational history. It creates inverse IMPORT_ROLLBACK movements, restores an updated product from its saved snapshot, and soft-deletes products created solely by the import. Rollback requires the imported movement to remain the latest stock activity and the imported product snapshot to remain unchanged.
 
+## Restaurant Operations
+
+The `20260714211500_restaurant_operations` migration keeps restaurant operations on the existing sales and inventory foundations:
+
+- `RestaurantTable` stores table number, section, capacity, status, guests, assigned employee, occupied time, notes, and active order.
+- `HeldSale` is the active restaurant order. It stores its generated order number, order type, lifecycle status, customer and queue details, charges, table assignment, optimistic version, employee lock lease, cancellation state, and completion time.
+- `HeldSaleItem` stores the selected warehouse, entered quantity and unit, converted base quantity, price, discount, tax, line total, item note, and soft-delete timestamp.
+- `Sale.heldSaleId` is unique and links the final paid sale back to its source order.
+
+Active order numbers use the existing durable `ReceiptSequence` table with `DINE`, `WALK`, `TAKE`, and `DEL` prefixes. Restaurant checkout uses the same transaction and permanent `InventoryMovement` rows as Retail POS; it does not maintain a second stock balance.
+
 ## Soft Deletes
 
 Operational entities include `deletedAt` and are filtered at the service layer.

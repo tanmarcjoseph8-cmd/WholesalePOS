@@ -73,6 +73,11 @@ export async function getSettings(actor: Actor) {
   return mergeSettings(saved);
 }
 
+export async function getRuntimeSettings(actor: Actor) {
+  const settings = await getSettings(actor);
+  return { businessMode: settings.businessMode, restaurant: settings.restaurant };
+}
+
 export async function updateSettings(actor: Actor, input: SettingsUpdateInput) {
   const storeId = requireStoreId(actor);
   const entries = Object.entries(input);
