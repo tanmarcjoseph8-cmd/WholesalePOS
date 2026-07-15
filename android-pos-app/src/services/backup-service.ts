@@ -26,7 +26,7 @@ export class BackupService {
     const payloadText = JSON.stringify(payload);
     const createdAt = nowIso();
     const envelope: BackupEnvelope = { format: "wholesalepos-offline-backup", schemaVersion: currentSchemaVersion, createdAt, payloadHash: await sha256(payloadText), payload };
-    const stamp = createdAt.replaceAll(":", "-").replaceAll(".", "-");
+    const stamp = createdAt.replace(/[:.]/g, "-");
     const uri = await this.files.saveAndShare({ fileName: `wholesalepos-backup-${stamp}.json`, data: JSON.stringify(envelope), mimeType: "application/json", dialogTitle: "Save POS backup" });
     await audit(this.db, { actorId: actor.id, action: "BACKUP_EXPORTED", entityType: "Backup", metadata: { createdAt, uri } });
     return uri;
@@ -43,9 +43,8 @@ export class BackupService {
     const safetyPayload = await this.db.exportFull();
     const safetyCreatedAt = nowIso();
     const safetyEnvelope: BackupEnvelope = { format: "wholesalepos-offline-backup", schemaVersion: currentSchemaVersion, createdAt: safetyCreatedAt, payloadHash: await sha256(JSON.stringify(safetyPayload)), payload: safetyPayload };
-    await this.files.saveAndShare({ fileName: `pre-restore-${safetyCreatedAt.replaceAll(":", "-")}.json`, data: JSON.stringify(safetyEnvelope), mimeType: "application/json", dialogTitle: "Save safety backup before restore" });
+    await this.files.saveAndShare({ fileName: `pre-restore-${safetyCreatedAt.replace(/:/g, "-")}.json`, data: JSON.stringify(safetyEnvelope), mimeType: "application/json", dialogTitle: "Save safety backup before restore" });
     await this.db.replaceFromExport(envelope.payload);
     await audit(this.db, { actorId: actor.id, action: "BACKUP_RESTORED", entityType: "Backup", reason: `Restored ${file.name}`, metadata: { backupCreatedAt: envelope.createdAt } });
   }
 }
-

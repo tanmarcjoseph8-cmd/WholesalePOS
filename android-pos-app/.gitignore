@@ -9,5 +9,6 @@ android/local.properties
 android/app/build/
 apk/*.apk
 apk/*.aab
+apk/*.zip
 !apk/.gitkeep
 .toolchain/

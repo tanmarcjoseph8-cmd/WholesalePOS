@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
+const { version } = JSON.parse(await readFile(resolve("package.json"), "utf8"));
 const candidates = [
-  ["android/app/build/outputs/apk/debug/app-debug.apk", "WholesalePOS-Offline-0.1.0-debug.apk"],
-  ["android/app/build/outputs/apk/release/app-release.apk", "WholesalePOS-Offline-0.1.0-release.apk"],
-  ["android/app/build/outputs/bundle/release/app-release.aab", "WholesalePOS-Offline-0.1.0-release.aab"]
+  ["android/app/build/outputs/apk/debug/app-debug.apk", `WholesalePOS-Offline-${version}-debug.apk`],
+  ["android/app/build/outputs/apk/release/app-release.apk", `WholesalePOS-Offline-${version}-release.apk`],
+  ["android/app/build/outputs/bundle/release/app-release.aab", `WholesalePOS-Offline-${version}-release.aab`]
 ];
 
 const output = resolve("apk");

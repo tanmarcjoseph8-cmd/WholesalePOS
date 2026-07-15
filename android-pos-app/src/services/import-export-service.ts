@@ -42,7 +42,10 @@ async function fingerprint(bytes: Uint8Array) {
 }
 
 function normalizeHeaders(row: Record<string, unknown>) {
-  return Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, "_"), value]));
+  return Object.entries(row).reduce<Record<string, unknown>>((normalized, [key, value]) => {
+    normalized[key.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")] = value;
+    return normalized;
+  }, {});
 }
 
 export class ImportExportService {

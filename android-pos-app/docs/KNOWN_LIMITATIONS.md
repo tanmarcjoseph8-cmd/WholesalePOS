@@ -11,7 +11,9 @@
 - Android backups are integrity protected JSON but are not encrypted files.
 - The release is signed with a private self-managed key, not a public app-store
   identity. Preserve that key for updates.
-- The automated device run used an Android 10 emulator. Physical tablet,
+- The automated device run used an Android 10 emulator. The build and dependency
+  manifests validate API 28, but a physical Fire OS 7 tablet remains required for
+  final Fire-specific acceptance. Physical tablet,
   Bluetooth printer, camera barcode, manufacturer power-management, and
   multi-hour load testing remain hardware acceptance tests.
 - The headless Android 10 emulator used for verification showed GPU/font capture

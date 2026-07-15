@@ -7,6 +7,6 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    target: "chrome74"
+    target: "chrome61"
   }
 });

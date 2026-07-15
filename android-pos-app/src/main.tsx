@@ -1,3 +1,4 @@
+import "./platform/legacy-webview";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./ui/App";
@@ -11,4 +12,3 @@ createRoot(root).render(
     <App />
   </StrictMode>
 );
-
