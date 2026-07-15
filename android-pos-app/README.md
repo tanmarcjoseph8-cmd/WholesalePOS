@@ -15,9 +15,9 @@ See `docs/AUDIT.md` for the Windows compatibility audit and `docs/ARCHITECTURE.m
 
 ## Installable builds
 
-- `apk/WholesalePOS-Offline-0.2.0-release.apk`: signed APK for direct tablet installation
-- `apk/WholesalePOS-Offline-0.2.0-debug.apk`: development APK
-- `apk/WholesalePOS-Offline-0.2.0-release.aab`: signed Android App Bundle
+- `apk/WholesalePOS-Offline-0.2.1-release.apk`: signed APK for direct tablet installation
+- `apk/WholesalePOS-Offline-0.2.1-debug.apk`: development APK
+- `apk/WholesalePOS-Offline-0.2.1-release.aab`: signed Android App Bundle
 - `apk/checksums.json`: SHA-256 checksums for all artifacts
 
 Start with [Build and installation](docs/BUILD_AND_INSTALL.md), then read [Backup and restore](docs/BACKUP_RESTORE.md) before entering live business data.

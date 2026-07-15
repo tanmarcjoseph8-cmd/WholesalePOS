@@ -285,6 +285,19 @@ td small { margin-top: 3px; color: var(--muted); }
 .status-label.low_stock { color: var(--warning); }
 .status-label.out_of_stock { color: var(--danger); }
 .status-label.normal { color: var(--success); }
+.dashboard-stock-alerts { overflow: hidden; }
+.dashboard-stock-alerts > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.dashboard-stock-alerts > header h3, .dashboard-stock-alerts > header p { margin: 0; }
+.dashboard-stock-alerts > header p { margin-top: 3px; color: var(--muted); font-size: .78rem; }
+.dashboard-stock-alerts > header > strong { min-width: 36px; color: var(--warning); font-size: 1.25rem; text-align: center; }
+.dashboard-stock-alerts > div { display: grid; }
+.dashboard-stock-alerts > div > button { display: grid; min-height: 66px; grid-template-columns: minmax(0, 1fr) minmax(150px, auto) auto 44px; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); text-align: left; }
+.dashboard-stock-alerts > div > button:hover { background: var(--surface-2); }
+.dashboard-stock-alerts > div > button > div { display: grid; gap: 3px; }
+.dashboard-stock-alerts > div > button span { color: var(--muted); font-size: .75rem; }
+.dashboard-stock-alerts .dashboard-stock-quantity { justify-items: end; }
+.dashboard-stock-alerts .status-label { color: var(--warning); }
+.dashboard-stock-alerts .status-label.out_of_stock { color: var(--danger); }
 
 .auth-page, .boot-page { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: var(--bg); }
 .auth-panel { width: min(440px, 100%); padding: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: var(--shadow); }
@@ -359,5 +372,8 @@ td small { margin-top: 3px; color: var(--muted); }
   .alert-copy > div { align-items: flex-start; flex-direction: column; gap: 5px; }
   .alert-list > article { grid-template-columns: 40px minmax(0, 1fr) 44px; gap: 8px; padding: 11px 9px; }
   .alert-icon { width: 40px; height: 40px; }
+  .dashboard-stock-alerts > div > button { grid-template-columns: minmax(0, 1fr) 44px; }
+  .dashboard-stock-alerts .dashboard-stock-quantity, .dashboard-stock-alerts .status-label { grid-column: 1; justify-self: start; justify-items: start; }
+  .dashboard-stock-alerts > div > button > svg { grid-column: 2; grid-row: 1 / span 3; }
   .pdf-preview-dialog { height: calc(100vh - 16px); }
 }

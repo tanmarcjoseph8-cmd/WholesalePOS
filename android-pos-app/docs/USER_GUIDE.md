@@ -56,6 +56,12 @@ only finalized local sales. Review summaries, payment and order-type breakdowns,
 best sellers, and optional transaction details. Generate a PDF, preview it with
 an installed PDF viewer, or use Android Share to save, send, or print it.
 
+The Dashboard **Products needing stock** list names every product currently low
+or out of stock and shows its available quantity and threshold. Tap a product to
+open it directly in Inventory. New in-app alert messages name up to three
+affected products and show how much remains; the Alerts screen keeps the complete
+list when more products are affected at once.
+
 Open **Alerts** to review unread and historical low-stock or out-of-stock events.
 Opening an alert marks it read and opens the affected product. Use **Mark all
 read** or **Clear read** as needed. Clearing hides notification history but does

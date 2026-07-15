@@ -6,7 +6,7 @@ Verified through 16 July 2026.
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 10 files, 28 tests passed for reporting ranges and totals, finalized
+- Vitest: 10 files, 29 tests passed for reporting ranges and totals, finalized
   sale filtering, PDF pagination and sharing, alert transitions, notification
   permissions/deep links, inventory events, migrations, calculations, security,
   and legacy WebView compatibility.
@@ -29,8 +29,8 @@ Verified through 16 July 2026.
 - Forced process stop and restart returned to the unlock screen, proving local
   account data persisted.
 - `adb install -r` update succeeded and the existing account remained.
-- Version 0.2.0 installed in place over the existing signed application and
-  retained its local account/database.
+- Version 0.2.1 installed in place over version 0.2.0 and retained the existing
+  local account/database.
 - An upgraded database with approximately 1,000 products reached the login
   screen after alert reconciliation was changed from per-product bridge calls
   to set-based SQLite statements.
@@ -42,8 +42,8 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The final release artifact is `WholesalePOS-Offline-0.2.0-release.apk`, version
-code 3. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+The final release artifact is `WholesalePOS-Offline-0.2.1-release.apk`, version
+code 4. It verifies with APK Signature Scheme v2 and the existing RSA 3072
 WholesalePOS release certificate.
 
 ## Fire OS 7 status

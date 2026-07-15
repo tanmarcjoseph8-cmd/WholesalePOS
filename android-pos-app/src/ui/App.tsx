@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { BarChart3, Bell, BellRing, Boxes, ClipboardList, LayoutDashboard, LogOut, RefreshCw, Settings, ShoppingCart, Utensils } from "lucide-react";
 import type { AppSettings, LocalUser } from "../domain/models";
+import { inventoryAlertMessage } from "../domain/inventory-alerts";
 import { lifecycleService } from "../platform/lifecycle";
 import { offlineApp } from "../services/offline-app";
 import { AppContext } from "./app-context";
@@ -74,10 +75,10 @@ export function App() {
       if (detail?.productId) { setInventoryFocusId(detail.productId); setPendingAlertId(detail.alertId ?? null); setView("inventory"); }
     };
     const alertsCreated = (event: Event) => {
-      const alerts = (event as CustomEvent<{ alerts?: Array<{ productName: string }> }>).detail.alerts ?? [];
+      const alerts = (event as CustomEvent<{ alerts?: Parameters<typeof inventoryAlertMessage>[0] }>).detail.alerts ?? [];
       setRevision((value) => value + 1);
-      if (alerts.length === 1) notify(`${alerts[0]?.productName ?? "A product"} needs stock attention.`, "error");
-      else if (alerts.length > 1) notify(`${alerts.length} products need stock attention.`, "error");
+      const message = inventoryAlertMessage(alerts);
+      if (message) notify(message, "error");
     };
     window.addEventListener("pos:confirm-leave", confirmLeave);
     window.addEventListener("pos:open-inventory-alert", openInventoryAlert);
@@ -102,7 +103,7 @@ export function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3500);
+    const timer = window.setTimeout(() => setToast(null), toast.tone === "error" ? 6500 : 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
