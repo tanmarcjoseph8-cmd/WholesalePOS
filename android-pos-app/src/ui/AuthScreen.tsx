@@ -30,8 +30,7 @@ export function AuthScreen({ app, requiresSetup, onAuthenticated }: { app: Offli
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="brand-mark"><ShieldCheck size={28} /></div>
-        <p className="eyebrow">WholesalePOS</p>
+        <div className="auth-brand"><div className="brand-mark"><ShieldCheck size={28} /></div><p className="eyebrow">WholesalePOS</p></div>
         <h1>{requiresSetup ? "Set up this tablet" : "Unlock this tablet"}</h1>
         <p className="muted">All operational data stays on this Android device.</p>
         <form onSubmit={submit} className="form-stack">
@@ -46,4 +45,3 @@ export function AuthScreen({ app, requiresSetup, onAuthenticated }: { app: Offli
     </main>
   );
 }
-

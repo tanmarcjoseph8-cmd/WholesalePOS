@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
-    backgroundColor: "#f1f5f9"
+    backgroundColor: "#f3f5f7"
   },
   plugins: {
     CapacitorSQLite: {
@@ -21,7 +21,7 @@ const config: CapacitorConfig = {
     },
     LocalNotifications: {
       smallIcon: "ic_launcher_foreground",
-      iconColor: "#176b54"
+      iconColor: "#0f766e"
     }
   }
 };

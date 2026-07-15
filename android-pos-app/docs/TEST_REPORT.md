@@ -2,6 +2,9 @@
 
 Verified through 16 July 2026.
 
+Version 0.3.0 adds the centralized Android presentation system and responsive UI
+redesign. Its before/after checks are recorded in `UI_REDESIGN_VERIFICATION.md`.
+
 ## Automated checks
 
 - ESLint: passed.
@@ -42,8 +45,8 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The final release artifact is `WholesalePOS-Offline-0.2.1-release.apk`, version
-code 4. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+The current release artifact is `WholesalePOS-Offline-0.3.0-release.apk`, version
+code 5. It verifies with APK Signature Scheme v2 and the existing RSA 3072
 WholesalePOS release certificate.
 
 ## Fire OS 7 status

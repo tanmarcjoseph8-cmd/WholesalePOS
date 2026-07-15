@@ -4,7 +4,7 @@ export function ConfirmDialog(props: { open: boolean; title: string; children: R
   if (!props.open) return null;
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && props.onClose()}>
-      <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <section className="dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <h2 id="confirm-title">{props.title}</h2>
         <div className="dialog-content">{props.children}</div>
         <div className="dialog-actions">
@@ -15,4 +15,3 @@ export function ConfirmDialog(props: { open: boolean; title: string; children: R
     </div>
   );
 }
-
