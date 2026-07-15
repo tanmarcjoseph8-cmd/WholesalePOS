@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.jks
+*.keystore
+android/.gradle/
+android/local.properties
+android/app/build/
+apk/*.apk
+apk/*.aab
+!apk/.gitkeep
+.toolchain/

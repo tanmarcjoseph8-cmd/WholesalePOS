@@ -1,0 +1,54 @@
+# File Summary
+
+All created or modified files are contained in `android-pos-app/`. Existing
+Windows application files changed: **none**.
+
+## Project and build
+
+- `package.json`, `pnpm-lock.yaml`: independent dependencies and scripts.
+- `capacitor.config.ts`: stable Android identity and offline Capacitor settings.
+- `vite.config.ts`, `vitest.config.ts`, `tsconfig*.json`, `eslint.config.js`:
+  TypeScript, build, test, and lint configuration.
+- `index.html`, `.gitignore`: application entry and artifact exclusions.
+- `scripts/create-release-keystore.mjs`, `scripts/collect-apk.mjs`: signing
+  bootstrap and reproducible artifact collection/checksums.
+- `apk/.gitkeep`, `apk/checksums.json`: artifact directory and hashes.
+
+## Application source
+
+- `src/domain/models.ts`, `calculations.ts`, `security.ts`: typed records, units,
+  integer money/quantity calculations, UUID compatibility, and PBKDF2.
+- `src/domain` test files: calculation and credential tests.
+- `src/data/database.ts`, `migrations.ts`, `migrations.test.ts`: Capacitor SQLite
+  adapter, transactions, export/import, schema, and migration checks.
+- `src/services` TypeScript files: auth, catalog, inventory, sales/refunds,
+  restaurant, settings/reports, imports/exports, backups, receipts, and auditing.
+- `src/platform` TypeScript files: Android lifecycle, back button, file picker,
+  filesystem, share, and platform boundaries.
+- `src/ui/App.tsx`, `app-context.ts`, `AuthScreen.tsx`, `ConfirmDialog.tsx`:
+  session shell and reusable UI behavior.
+- `src/ui/views` TSX files: dashboard, POS, inventory/import, restaurant, sales,
+  reports, users, settings, backups, and exports.
+- `src/main.tsx`, `src/styles.css`: application bootstrap and responsive styling.
+
+## Native Android project
+
+- `android/gradle`, `android/build.gradle`, `settings.gradle`,
+  `variables.gradle`: Gradle wrapper and API 29/36 configuration.
+- `android/app/build.gradle`, `proguard-rules.pro`: application, release signing,
+  shrinking, and R8 rules.
+- `android/app/src/main/AndroidManifest.xml`: offline manifest and backup policy.
+- `android/app/src/main/java/com/wholesalepos/offline/MainActivity.java`: native
+  Capacitor activity.
+- `android/app/src/main/res`: launcher, splash, styles, file provider, and
+  data-extraction resources.
+- `ApplicationConfigTest.java`: stable package test.
+- `OfflineSecurityTest.java`: device assertion that internet permission is absent.
+
+## Documentation
+
+- `docs/AUDIT.md`, `ARCHITECTURE.md`: protected baseline and Android design.
+- `docs/BUILD_AND_INSTALL.md`, `USER_GUIDE.md`, `BACKUP_RESTORE.md`,
+  `PRINTER_SETUP.md`, `IMPORT_TEMPLATE.md`, `product-import-template.csv`,
+  `MIGRATION_NOTES.md`, `KNOWN_LIMITATIONS.md`, `TEST_REPORT.md`: build,
+  operation, recovery, import, migration, constraints, and evidence.

@@ -1,0 +1,52 @@
+{
+  "name": "wholesalepos-offline-android",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent offline Android tablet edition of WholesalePOS.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src scripts vite.config.ts capacitor.config.ts",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "cap:sync": "pnpm build && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "pnpm cap:sync && cd android && gradlew.bat assembleDebug",
+    "android:release": "pnpm cap:sync && cd android && gradlew.bat bundleRelease",
+    "signing:create": "node scripts/create-release-keystore.mjs",
+    "apk:collect": "node scripts/collect-apk.mjs"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "8.1.0",
+    "@capacitor/android": "8.4.2",
+    "@capacitor/app": "8.0.0",
+    "@capacitor/core": "8.4.2",
+    "@capacitor/filesystem": "8.1.0",
+    "@capacitor/share": "8.0.0",
+    "@capawesome/capacitor-file-picker": "8.0.3",
+    "jspdf": "3.0.3",
+    "lucide-react": "0.468.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "xlsx": "0.18.5",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.2",
+    "@eslint/js": "9.17.0",
+    "@types/react": "19.0.2",
+    "@types/react-dom": "19.0.2",
+    "@vitejs/plugin-react": "4.3.4",
+    "eslint": "9.17.0",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "eslint-plugin-react-refresh": "0.4.16",
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.18.2",
+    "vite": "6.4.3",
+    "vitest": "2.1.9"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

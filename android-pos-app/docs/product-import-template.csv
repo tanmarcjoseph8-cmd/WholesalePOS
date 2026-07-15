@@ -1,0 +1,4 @@
+name,sku,barcode,inventory_unit,selling_unit,cost_price,retail_price,wholesale_price,starting_stock,minimum_stock
+Steel Bar,STEEL-12M,,METER,METER,180,220,205,120,20
+Bottled Water,WATER-500,480000000001,MILLILITER,MILLILITER,0.02,0.03,0.025,50000,10000
+Rice 25kg,RICE-25KG,,KILOGRAM,KILOGRAM,48,55,52,250,50

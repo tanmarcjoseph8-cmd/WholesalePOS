@@ -1,0 +1,7 @@
+allowBuilds:
+  core-js: true
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@capacitor/android@8.4.2'
+  - '@capacitor/cli@8.4.2'
+  - '@capacitor/core@8.4.2'
