@@ -50,6 +50,19 @@ The dashboard, inventory, sales, and restaurant views read the same SQLite
 database. Writes trigger an in-app refresh, and reopening the app reloads the
 latest committed data.
 
+Open **Reports** for today, this week, this month, previous periods, or a custom
+date range. Reports use the business timezone configured in **Settings** and use
+only finalized local sales. Review summaries, payment and order-type breakdowns,
+best sellers, and optional transaction details. Generate a PDF, preview it with
+an installed PDF viewer, or use Android Share to save, send, or print it.
+
+Open **Alerts** to review unread and historical low-stock or out-of-stock events.
+Opening an alert marks it read and opens the affected product. Use **Mark all
+read** or **Clear read** as needed. Clearing hides notification history but does
+not remove products, stock movements, or current stock status. Restocking an item
+returns it to normal; if it later crosses the threshold again, a new alert is
+created.
+
 ## Daily close
 
 Export the day's sales CSV, review low stock, create a full backup, and move that

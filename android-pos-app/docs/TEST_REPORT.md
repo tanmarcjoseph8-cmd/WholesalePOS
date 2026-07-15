@@ -6,8 +6,10 @@ Verified through 16 July 2026.
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 4 files, 11 tests passed for calculations, security, migrations, and
-  legacy WebView compatibility.
+- Vitest: 10 files, 28 tests passed for reporting ranges and totals, finalized
+  sale filtering, PDF pagination and sharing, alert transitions, notification
+  permissions/deep links, inventory events, migrations, calculations, security,
+  and legacy WebView compatibility.
 - Vite production build targeting Chrome 61-era WebView syntax: passed.
 - Capacitor Android sync: passed.
 - Gradle native unit test: passed.
@@ -16,6 +18,8 @@ Verified through 16 July 2026.
 - Release APK signature: APK Signature Scheme v2, RSA 3072.
 - Manifest: minimum API 28, target API 36, no `INTERNET` permission.
 - Every packaged Capacitor plugin declares support for API 24 or newer.
+- Sample A4 report: three pages rendered and visually checked; every page has a
+  footer and page number, and monetary values use readable `PHP` labels.
 
 ## Android 10 emulator
 
@@ -25,15 +29,22 @@ Verified through 16 July 2026.
 - Forced process stop and restart returned to the unlock screen, proving local
   account data persisted.
 - `adb install -r` update succeeded and the existing account remained.
-- Version 0.1.1 installed over 0.1.0, retained the `FireOwner` account, and
-  successfully unlocked to the dashboard with networking disabled.
+- Version 0.2.0 installed in place over the existing signed application and
+  retained its local account/database.
+- An upgraded database with approximately 1,000 products reached the login
+  screen after alert reconciliation was changed from per-product bridge calls
+  to set-based SQLite statements.
 - The app reported the local database as healthy.
 - No fatal Android process or uncaught JavaScript error remained in the final run.
 
 The emulator found and drove the fix for Android 10 WebView support:
 `crypto.randomUUID()` now has a secure `crypto.getRandomValues()` UUID fallback.
-Version 0.1.1 also installs compatibility implementations for `replaceAll` and
+Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
+
+The final release artifact is `WholesalePOS-Offline-0.2.0-release.apk`, version
+code 3. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+WholesalePOS release certificate.
 
 ## Fire OS 7 status
 

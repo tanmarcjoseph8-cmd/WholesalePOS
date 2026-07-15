@@ -13,3 +13,8 @@ Android updates use ordered SQLite migrations recorded in `schema_migrations`.
 Startup never drops or recreates the operational database. Keep the package ID
 and release signing key unchanged, increment the Android version, make a full
 backup, and install updates in place.
+
+Version 0.2.0 adds migration 3 with `inventory_alert_state` and
+`inventory_alerts`. It does not rewrite products, stock, sales, payments, users,
+or settings. The first launch derives alert state from the authoritative
+available-inventory view in one transaction. Existing data remains unchanged.

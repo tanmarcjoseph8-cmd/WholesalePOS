@@ -9,6 +9,9 @@ export type AppContextValue = {
   refresh: () => void;
   setUnsaved: (unsaved: boolean) => void;
   notify: (message: string, tone?: "success" | "error") => void;
+  inventoryFocusId: string | null;
+  openInventoryProduct: (productId: string) => void;
+  clearInventoryFocus: () => void;
 };
 
 export const AppContext = createContext<AppContextValue | null>(null);
@@ -18,4 +21,3 @@ export function useOfflineApp() {
   if (!context) throw new Error("App context is unavailable.");
   return context;
 }
-

@@ -4,11 +4,21 @@ import { currentSchemaVersion, migrations } from "./migrations";
 import { nowIso } from "../domain/models";
 
 export type SqlValue = string | number | null;
+export type InventoryChangeListener = () => Promise<unknown> | unknown;
+
+export function isInventoryMutationSql(sql: string) {
+  const normalized = sql.trim().toLowerCase();
+  if (!/^(insert|update|delete|replace)\b/.test(normalized)) return false;
+  return /\b(inventory_stock|inventory_reservations|products|settings)\b/.test(normalized);
+}
 
 export class LocalDatabase {
   readonly name = "wholesalepos_offline";
   private manager = new SQLiteConnection(CapacitorSQLite);
   private connection: SQLiteDBConnection | null = null;
+  private inventoryListeners = new Set<InventoryChangeListener>();
+  private transactionDepth = 0;
+  private inventoryChangePending = false;
 
   async initialize() {
     if (!Capacitor.isNativePlatform()) {
@@ -68,7 +78,12 @@ export class LocalDatabase {
   }
 
   async run(sql: string, values: SqlValue[] = [], transaction = true) {
-    return this.requireConnection().run(sql, values, transaction);
+    const result = await this.requireConnection().run(sql, values, transaction);
+    if (isInventoryMutationSql(sql)) {
+      this.inventoryChangePending = true;
+      if (this.transactionDepth === 0) await this.flushInventoryChanges();
+    }
+    return result;
   }
 
   async query<T extends object>(sql: string, values: SqlValue[] = []) {
@@ -78,14 +93,42 @@ export class LocalDatabase {
 
   async transaction<T>(operation: () => Promise<T>) {
     const connection = this.requireConnection();
-    await connection.beginTransaction();
+    const pendingBefore = this.inventoryChangePending;
+    this.transactionDepth += 1;
+    try {
+      await connection.beginTransaction();
+    } catch (error) {
+      this.transactionDepth = Math.max(0, this.transactionDepth - 1);
+      throw error;
+    }
     try {
       const result = await operation();
       await connection.commitTransaction();
+      this.transactionDepth -= 1;
+      if (this.transactionDepth === 0) await this.flushInventoryChanges();
       return result;
     } catch (error) {
       if ((await connection.isTransactionActive()).result) await connection.rollbackTransaction();
+      this.transactionDepth = Math.max(0, this.transactionDepth - 1);
+      this.inventoryChangePending = pendingBefore;
       throw error;
+    }
+  }
+
+  subscribeInventoryChanges(listener: InventoryChangeListener) {
+    this.inventoryListeners.add(listener);
+    return () => this.inventoryListeners.delete(listener);
+  }
+
+  private async flushInventoryChanges() {
+    if (!this.inventoryChangePending) return;
+    this.inventoryChangePending = false;
+    for (const listener of this.inventoryListeners) {
+      try {
+        await listener();
+      } catch {
+        // Inventory commits remain authoritative even if a best-effort alert refresh fails.
+      }
     }
   }
 

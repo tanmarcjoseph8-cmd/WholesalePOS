@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArchiveRestore, Database, Download, FileDown, Save, ShieldCheck, UserPlus } from "lucide-react";
-import type { AppSettings, LocalUser } from "../../domain/models";
+import { ArchiveRestore, Bell, Database, Download, FileDown, Save, ShieldCheck, UserPlus } from "lucide-react";
+import { QUANTITY_SCALE, type AppSettings, type LocalUser } from "../../domain/models";
 import { useOfflineApp } from "../app-context";
 import { ConfirmDialog } from "../ConfirmDialog";
 
@@ -17,11 +17,13 @@ export function SettingsView() {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreText, setRestoreText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState("checking");
   const [newUser, setNewUser] = useState({ name: "", login: "", secret: "", role: "CASHIER" as "CASHIER" | "MANAGER" });
 
   useEffect(() => {
-    void Promise.all([app.settingsReports.getSettings(), app.auth.listUsers(), app.database.schemaVersion(), app.database.integrityCheck()]).then(([nextSettings, nextUsers, version, healthy]) => {
+    void Promise.all([app.settingsReports.getSettings(), app.auth.listUsers(), app.database.schemaVersion(), app.database.integrityCheck(), app.inventoryNotifications.permissionStatus()]).then(([nextSettings, nextUsers, version, healthy, permission]) => {
       setSettings(nextSettings); setUsers(nextUsers); setSchemaVersion(version); setIntegrity(healthy);
+      setNotificationPermission(permission);
     });
   }, [app]);
 
@@ -29,7 +31,7 @@ export function SettingsView() {
     event.preventDefault();
     if (!settings) return;
     setBusy(true);
-    try { await app.settingsReports.updateSettings(user, settings); document.documentElement.dataset.theme = settings.darkMode ? "dark" : "light"; refresh(); notify("Settings saved.", "success"); }
+    try { await app.settingsReports.updateSettings(user, settings); const permission = await app.inventoryNotifications.activate(settings); setNotificationPermission(permission); await app.inventoryAlerts.reconcileAndNotify(); document.documentElement.dataset.theme = settings.darkMode ? "dark" : "light"; refresh(); notify("Settings saved.", "success"); }
     catch (error) { notify(error instanceof Error ? error.message : "Settings could not be saved.", "error"); }
     finally { setBusy(false); }
   }
@@ -70,7 +72,15 @@ export function SettingsView() {
           <label>Receipt paper<select value={settings.paperWidth} onChange={(event) => setSettings({ ...settings, paperWidth: event.target.value as AppSettings["paperWidth"] })}><option value="58mm">58 mm</option><option value="80mm">80 mm</option></select></label>
           <label>Receipt footer<input value={settings.receiptFooter} onChange={(event) => setSettings({ ...settings, receiptFooter: event.target.value })} /></label>
           <label>Service charge (%)<input type="number" min="0" max="100" step="0.01" value={settings.serviceChargeBasisPoints / 100} onChange={(event) => setSettings({ ...settings, serviceChargeBasisPoints: Math.round(Number(event.target.value) * 100) })} /></label>
+          <label>Business timezone<input value={settings.businessTimezone} onChange={(event) => setSettings({ ...settings, businessTimezone: event.target.value })} placeholder="Asia/Manila" /></label>
           <label>Custom order types<input value={settings.customOrderTypes.join(", ")} onChange={(event) => setSettings({ ...settings, customOrderTypes: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} placeholder="Curbside, Catering" /></label>
+          <h4 className="settings-subheading"><Bell size={18} /> Inventory alerts</h4>
+          <label>Default low-stock threshold<input type="number" min="0" step="any" value={settings.defaultLowStockThresholdMicro / QUANTITY_SCALE} onChange={(event) => setSettings({ ...settings, defaultLowStockThresholdMicro: Math.max(0, Math.round(Number(event.target.value) * QUANTITY_SCALE)) })} /><small className="field-help">Used only when a product threshold is zero.</small></label>
+          <label className="toggle-row"><input type="checkbox" checked={settings.inventoryNotificationsEnabled} onChange={(event) => setSettings({ ...settings, inventoryNotificationsEnabled: event.target.checked })} /> Android system notifications</label>
+          <label className="toggle-row"><input type="checkbox" checked={settings.lowStockNotificationsEnabled} onChange={(event) => setSettings({ ...settings, lowStockNotificationsEnabled: event.target.checked })} /> Low-stock notifications</label>
+          <label className="toggle-row"><input type="checkbox" checked={settings.outOfStockNotificationsEnabled} onChange={(event) => setSettings({ ...settings, outOfStockNotificationsEnabled: event.target.checked })} /> Out-of-stock notifications</label>
+          <label className="toggle-row"><input type="checkbox" checked={settings.inventoryNotificationSound} onChange={(event) => setSettings({ ...settings, inventoryNotificationSound: event.target.checked })} /> Notification sound</label>
+          <p className="permission-status">Android permission: <strong>{notificationPermission.replaceAll("-", " ")}</strong></p>
           <label className="toggle-row"><input type="checkbox" checked={settings.darkMode} onChange={(event) => setSettings({ ...settings, darkMode: event.target.checked })} /> Dark theme</label>
           <button className="button primary" disabled={!canManage || busy}><Save size={18} /> Save settings</button>
         </form>

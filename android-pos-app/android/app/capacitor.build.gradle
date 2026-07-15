@@ -12,6 +12,8 @@ dependencies {
     implementation project(':capacitor-community-sqlite')
     implementation project(':capacitor-app')
     implementation project(':capacitor-filesystem')
+    implementation project(':capacitor-file-viewer')
+    implementation project(':capacitor-local-notifications')
     implementation project(':capacitor-share')
     implementation project(':capawesome-capacitor-file-picker')
 

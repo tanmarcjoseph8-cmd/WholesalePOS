@@ -9,7 +9,8 @@ React tablet UI
       -> Capacitor SQLite (on-device only)
   -> platform adapters
     -> App lifecycle / back button
-    -> File picker, filesystem, share sheet
+    -> File picker, filesystem, PDF viewer, share sheet
+    -> Android local notification channels and deep links
     -> receipt PDF and printer interface
 ```
 
@@ -32,6 +33,10 @@ No HTTP server, loopback port, remote database, or Windows process is required.
 - Financial amounts are integer centavos.
 - Quantities are stored as integer millionths of the base unit.
 - Unique request keys make checkout and reversal submissions idempotent.
+- Sales reports are derived from finalized sales, sale items, payments, refunds,
+  and voids in the same local database; no reporting cache duplicates totals.
+- Available stock is physical stock minus active order reservations. A set-based
+  reconciliation transaction persists alert state and transition history for the
+  full catalog without per-product native bridge calls.
 - Backup restore validates format, schema version, and integrity before replacement.
 - Database files are excluded from Android cloud backup to keep operational data local.
-

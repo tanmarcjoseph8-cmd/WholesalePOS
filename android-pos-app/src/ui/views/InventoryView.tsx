@@ -12,8 +12,13 @@ function productToInput(product: ProductRecord): ProductInput {
   return { id: product.id, sku: product.sku, barcode: product.barcode, name: product.name, categoryId: product.categoryId, inventoryUnit: product.inventoryUnit, sellingUnit: product.sellingUnit, unitRatioMicro: product.unitRatioMicro, packageSizeMicro: product.packageSizeMicro, costPriceCents: product.costPriceCents, retailPriceCents: product.retailPriceCents, wholesalePriceCents: product.wholesalePriceCents, wholesaleThresholdMicro: product.wholesaleThresholdMicro, taxBasisPoints: product.taxBasisPoints, minimumStockMicro: product.minimumStockMicro, status: product.status };
 }
 
+function isLowStock(product: ProductRecord, defaultThresholdMicro: number) {
+  const threshold = product.minimumStockMicro > 0 ? product.minimumStockMicro : defaultThresholdMicro;
+  return product.availableMicro <= 0 || (threshold > 0 && product.availableMicro <= threshold);
+}
+
 export function InventoryView() {
-  const { app, user, revision, refresh, notify } = useOfflineApp();
+  const { app, user, revision, refresh, notify, inventoryFocusId, clearInventoryFocus } = useOfflineApp();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [search, setSearch] = useState("");
@@ -25,8 +30,18 @@ export function InventoryView() {
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importMode, setImportMode] = useState<"SKIP" | "UPDATE">("SKIP");
   const [busy, setBusy] = useState(false);
+  const [defaultThresholdMicro, setDefaultThresholdMicro] = useState(0);
 
-  useEffect(() => { void Promise.all([app.catalog.listProducts(search, true), app.catalog.listCategories()]).then(([items, nextCategories]) => { setProducts(items); setCategories(nextCategories); setStockProductId((current) => current || items[0]?.id || ""); }); }, [app, revision, search]);
+  useEffect(() => { void Promise.all([app.catalog.listProducts(search, true), app.catalog.listCategories(), app.settingsReports.getSettings()]).then(([items, nextCategories, settings]) => { setProducts(items); setCategories(nextCategories); setDefaultThresholdMicro(settings.defaultLowStockThresholdMicro); setStockProductId((current) => current || items[0]?.id || ""); }); }, [app, revision, search]);
+  useEffect(() => {
+    if (!inventoryFocusId) return;
+    void app.catalog.getProduct(inventoryFocusId).then((product) => {
+      setSearch("");
+      setEditor(productToInput(product));
+      setStockProductId(product.id);
+      clearInventoryFocus();
+    }).catch((caught: unknown) => notify(caught instanceof Error ? caught.message : "The inventory item could not be opened.", "error"));
+  }, [app, inventoryFocusId, clearInventoryFocus, notify]);
   const selectedStockProduct = useMemo(() => products.find((product) => product.id === stockProductId), [products, stockProductId]);
 
   async function saveProduct(event: FormEvent) {
@@ -86,7 +101,7 @@ export function InventoryView() {
       <label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product, SKU, or barcode" /></label>
       <div className="inventory-layout">
         <section className="data-panel product-list-panel">
-          <div className="table-scroll"><table><thead><tr><th>Product</th><th>Physical</th><th>Reserved</th><th>Available</th><th>Price</th><th aria-label="Actions" /></tr></thead><tbody>{products.map((product) => <tr key={product.id}><td><strong>{product.name}</strong><small>{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</small></td><td>{formatQuantity(product.stockMicro)}</td><td>{formatQuantity(product.reservedMicro)}</td><td className={product.availableMicro <= product.minimumStockMicro ? "low" : ""}>{formatQuantity(product.availableMicro)}</td><td>{formatMoney(product.retailPriceCents)}</td><td><div className="row-actions"><button aria-label={`Edit ${product.name}`} onClick={() => setEditor(productToInput(product))}><Pencil size={17} /></button><button className="icon-danger" aria-label={`Deactivate ${product.name}`} onClick={() => { const reason = window.prompt(`Reason for deactivating ${product.name}`); if (reason) void app.catalog.deactivateProduct(user, product.id, reason).then(refresh).catch((error: unknown) => notify(error instanceof Error ? error.message : "Unable to deactivate product.", "error")); }}><Trash2 size={17} /></button></div></td></tr>)}</tbody></table></div>
+          <div className="table-scroll"><table><thead><tr><th>Product</th><th>Physical</th><th>Reserved</th><th>Available</th><th>Price</th><th aria-label="Actions" /></tr></thead><tbody>{products.map((product) => <tr key={product.id}><td><strong>{product.name}</strong><small>{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</small></td><td>{formatQuantity(product.stockMicro)}</td><td>{formatQuantity(product.reservedMicro)}</td><td className={isLowStock(product, defaultThresholdMicro) ? "low" : ""}>{formatQuantity(product.availableMicro)}</td><td>{formatMoney(product.retailPriceCents)}</td><td><div className="row-actions"><button aria-label={`Edit ${product.name}`} onClick={() => setEditor(productToInput(product))}><Pencil size={17} /></button><button className="icon-danger" aria-label={`Deactivate ${product.name}`} onClick={() => { const reason = window.prompt(`Reason for deactivating ${product.name}`); if (reason) void app.catalog.deactivateProduct(user, product.id, reason).then(refresh).catch((error: unknown) => notify(error instanceof Error ? error.message : "Unable to deactivate product.", "error")); }}><Trash2 size={17} /></button></div></td></tr>)}</tbody></table></div>
         </section>
         <form className="data-panel stock-form" onSubmit={saveStock}><h3>Stock movement</h3><label>Product<select value={stockProductId} onChange={(event) => setStockProductId(event.target.value)}>{products.filter((product) => product.status === "ACTIVE").map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}</select></label><label>Movement<select value={stockType} onChange={(event) => setStockType(event.target.value as typeof stockType)}><option value="STOCK_IN">Add stock</option><option value="STOCK_OUT">Remove stock</option><option value="ADJUSTMENT">Set counted stock</option></select></label><label>{stockType === "ADJUSTMENT" ? "Counted quantity" : "Quantity"}<input type="number" min="0" step="any" value={stockQuantity} onChange={(event) => setStockQuantity(Number(event.target.value))} required /></label><label>Reason<input value={stockReason} onChange={(event) => setStockReason(event.target.value)} minLength={3} required /></label>{selectedStockProduct ? <p className="stock-summary">Current available: <strong>{formatQuantity(selectedStockProduct.availableMicro)} {selectedStockProduct.inventoryUnit.toLowerCase()}</strong></p> : null}<button className="button primary wide" disabled={busy || !stockProductId}><RefreshCw size={18} /> Save stock</button></form>
       </div>

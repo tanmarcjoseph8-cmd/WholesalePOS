@@ -133,11 +133,45 @@ export type AppSettings = {
   businessName: string;
   businessMode: "RETAIL" | "RESTAURANT" | "HYBRID";
   currency: "PHP";
+  businessTimezone: string;
   paperWidth: "58mm" | "80mm";
   receiptFooter: string;
   serviceChargeBasisPoints: number;
   customOrderTypes: string[];
+  defaultLowStockThresholdMicro: number;
+  inventoryNotificationsEnabled: boolean;
+  lowStockNotificationsEnabled: boolean;
+  outOfStockNotificationsEnabled: boolean;
+  inventoryNotificationSound: boolean;
   darkMode: boolean;
+};
+
+export type StockAlertStatus = "NORMAL" | "LOW_STOCK" | "OUT_OF_STOCK";
+
+export type InventoryAlertRecord = {
+  id: string;
+  productId: string;
+  productName: string;
+  warehouseId: string;
+  warehouseName: string;
+  inventoryUnit: UnitCode;
+  alertType: Exclude<StockAlertStatus, "NORMAL">;
+  currentQuantityMicro: number;
+  thresholdMicro: number;
+  isRead: boolean;
+  isResolved: boolean;
+  createdAt: string;
+};
+
+export type InventoryStatusRecord = {
+  productId: string;
+  productName: string;
+  warehouseId: string;
+  warehouseName: string;
+  inventoryUnit: UnitCode;
+  status: StockAlertStatus;
+  currentQuantityMicro: number;
+  thresholdMicro: number;
 };
 
 export function createUuid() {

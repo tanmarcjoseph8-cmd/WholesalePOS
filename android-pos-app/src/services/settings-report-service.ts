@@ -1,15 +1,23 @@
 import type { LocalDatabase } from "../data/database";
 import { nowIso, type AppSettings, type DashboardSnapshot, type LocalUser } from "../domain/models";
 import { audit } from "./service-helpers";
+import { effectiveStockThreshold } from "../domain/inventory-alerts";
+import { reportRange } from "../domain/reporting";
 
 const defaults: AppSettings = {
   businessName: "WholesalePOS Offline",
   businessMode: "HYBRID",
   currency: "PHP",
+  businessTimezone: "Asia/Manila",
   paperWidth: "80mm",
   receiptFooter: "Thank you",
   serviceChargeBasisPoints: 0,
   customOrderTypes: [],
+  defaultLowStockThresholdMicro: 0,
+  inventoryNotificationsEnabled: true,
+  lowStockNotificationsEnabled: true,
+  outOfStockNotificationsEnabled: true,
+  inventoryNotificationSound: true,
   darkMode: false
 };
 
@@ -24,6 +32,12 @@ export class SettingsReportService {
 
   async updateSettings(actor: LocalUser, settings: AppSettings) {
     if (!actor.permissions.includes("*") && !actor.permissions.includes("settings.manage")) throw new Error("Settings permission is required.");
+    if (!Number.isSafeInteger(settings.defaultLowStockThresholdMicro) || settings.defaultLowStockThresholdMicro < 0) throw new Error("Default low-stock threshold must be a valid non-negative quantity.");
+    try {
+      new Intl.DateTimeFormat("en-PH", { timeZone: settings.businessTimezone }).format();
+    } catch {
+      throw new Error("Enter a valid IANA business timezone, such as Asia/Manila.");
+    }
     const now = nowIso();
     await this.db.transaction(async () => {
       await this.db.run(
@@ -36,15 +50,17 @@ export class SettingsReportService {
   }
 
   async dashboard(): Promise<DashboardSnapshot> {
-    const today = new Date().toISOString().slice(0, 10);
+    const settings = await this.getSettings();
+    const today = reportRange("TODAY", settings.businessTimezone);
     const sales = await this.db.query<{ total: number; count: number }>(
-      "SELECT COALESCE(SUM(grand_total_cents),0) AS total, COUNT(*) AS count FROM sales WHERE substr(created_at,1,10)=? AND status IN ('COMPLETED','PARTIALLY_REFUNDED') AND deleted_at IS NULL",
-      [today]
+      "SELECT COALESCE(SUM(grand_total_cents),0) AS total, COUNT(*) AS count FROM sales WHERE created_at>=? AND created_at<? AND status IN ('COMPLETED','PARTIALLY_REFUNDED') AND deleted_at IS NULL",
+      [today.startIso, today.endExclusiveIso]
     );
     const stock = await this.db.query<{ available: number; low_count: number }>(
       `SELECT COALESCE(SUM(ai.available_micro),0) AS available,
-        COALESCE(SUM(CASE WHEN ai.available_micro <= p.minimum_stock_micro THEN 1 ELSE 0 END),0) AS low_count
+        COALESCE(SUM(CASE WHEN ai.available_micro <= CASE WHEN p.minimum_stock_micro>0 THEN p.minimum_stock_micro ELSE ? END THEN 1 ELSE 0 END),0) AS low_count
        FROM available_inventory ai JOIN products p ON p.id=ai.product_id WHERE p.status='ACTIVE' AND p.deleted_at IS NULL`
+      , [effectiveStockThreshold(0, settings.defaultLowStockThresholdMicro)]
     );
     const orders = await this.db.query<{ count: number }>("SELECT COUNT(*) AS count FROM orders WHERE status NOT IN ('COMPLETED','CANCELLED') AND deleted_at IS NULL");
     const tables = await this.db.query<{ count: number }>("SELECT COUNT(*) AS count FROM restaurant_tables WHERE active_order_id IS NOT NULL AND is_active=1 AND deleted_at IS NULL");
@@ -78,4 +94,3 @@ export class SettingsReportService {
     );
   }
 }
-

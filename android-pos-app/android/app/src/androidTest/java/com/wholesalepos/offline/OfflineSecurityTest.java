@@ -15,7 +15,7 @@ public class OfflineSecurityTest {
     @Test
     public void applicationHasNoInternetPermission() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.wholesalepos.offline", context.getPackageName());
+        assertEquals("com.wholesalepos.offline.debug", context.getPackageName());
         assertEquals(
             PackageManager.PERMISSION_DENIED,
             context.checkSelfPermission(Manifest.permission.INTERNET)

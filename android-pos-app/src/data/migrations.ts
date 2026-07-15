@@ -365,8 +365,44 @@ FROM sales
 WHERE deleted_at IS NULL
 GROUP BY substr(created_at, 1, 10);
 `
+  },
+  {
+    version: 3,
+    name: "persistent_inventory_alerts",
+    sql: `
+CREATE TABLE IF NOT EXISTS inventory_alert_state (
+  product_id TEXT NOT NULL REFERENCES products(id),
+  warehouse_id TEXT NOT NULL REFERENCES warehouses(id),
+  current_status TEXT NOT NULL CHECK(current_status IN ('NORMAL','LOW_STOCK','OUT_OF_STOCK')),
+  current_quantity_micro INTEGER NOT NULL,
+  threshold_micro INTEGER NOT NULL CHECK(threshold_micro >= 0),
+  last_alert_type TEXT CHECK(last_alert_type IS NULL OR last_alert_type IN ('LOW_STOCK','OUT_OF_STOCK')),
+  last_alert_at TEXT,
+  resolved_at TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(product_id, warehouse_id)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_alerts (
+  id TEXT PRIMARY KEY NOT NULL,
+  event_key TEXT NOT NULL UNIQUE,
+  product_id TEXT NOT NULL REFERENCES products(id),
+  warehouse_id TEXT NOT NULL REFERENCES warehouses(id),
+  alert_type TEXT NOT NULL CHECK(alert_type IN ('LOW_STOCK','OUT_OF_STOCK')),
+  quantity_micro INTEGER NOT NULL,
+  threshold_micro INTEGER NOT NULL CHECK(threshold_micro >= 0),
+  is_read INTEGER NOT NULL DEFAULT 0 CHECK(is_read IN (0,1)),
+  system_notified_at TEXT,
+  resolved_at TEXT,
+  cleared_at TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS inventory_alerts_unread_idx ON inventory_alerts(is_read, cleared_at, created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_alerts_product_idx ON inventory_alerts(product_id, warehouse_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_alert_state_status_idx ON inventory_alert_state(current_status, updated_at DESC);
+`
   }
 ];
 
 export const currentSchemaVersion = migrations[migrations.length - 1]?.version ?? 0;
-

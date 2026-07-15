@@ -1,6 +1,6 @@
 {
   "name": "wholesalepos-offline-android",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Independent offline Android tablet edition of WholesalePOS.",
@@ -8,10 +8,11 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --config vitest.config.mjs",
+    "test:watch": "vitest --config vitest.config.mjs",
     "lint": "eslint src scripts vite.config.ts capacitor.config.ts",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "sample:report": "vite-node scripts/generate-sample-report.ts",
     "cap:sync": "pnpm build && cap sync android",
     "android:open": "cap open android",
     "android:debug": "pnpm cap:sync && cd android && gradlew.bat assembleDebug",
@@ -25,6 +26,8 @@
     "@capacitor/app": "8.0.0",
     "@capacitor/core": "8.4.2",
     "@capacitor/filesystem": "8.1.0",
+    "@capacitor/file-viewer": "2.0.1",
+    "@capacitor/local-notifications": "8.0.0",
     "@capacitor/share": "8.0.0",
     "@capawesome/capacitor-file-picker": "8.0.3",
     "jspdf": "3.0.3",
@@ -46,6 +49,7 @@
     "typescript": "5.7.2",
     "typescript-eslint": "8.18.2",
     "vite": "6.4.3",
+    "vite-node": "2.1.9",
     "vitest": "2.1.9"
   },
   "packageManager": "pnpm@11.7.0"

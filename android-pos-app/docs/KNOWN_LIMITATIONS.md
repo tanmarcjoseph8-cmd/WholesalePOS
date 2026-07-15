@@ -19,3 +19,15 @@
 - The headless Android 10 emulator used for verification showed GPU/font capture
   artifacts; the accessibility tree and app flows remained functional. Check
   visuals on the target physical tablet before deployment.
+- Android system notifications are delivered while the app process is running
+  and after local stock changes. The app has no server or background sync that
+  can receive stock changes while it is closed. Persisted in-app alerts are
+  reconciled whenever the app starts or inventory changes.
+- At most 100 pending product alerts are submitted to the Android notification
+  tray in one activation to protect older Fire tablets. Every alert remains in
+  the in-app Alerts screen, and later activations continue pending delivery.
+- PDF preview requires a PDF-capable application installed on the tablet. The
+  Android share sheet remains available for saving, sharing, or printing.
+- Refunds and voids are grouped into the report period of their original sale.
+  The app does not yet provide a separate cash-movement report grouped by the
+  date a reversal was processed.

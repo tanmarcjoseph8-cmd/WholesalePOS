@@ -18,9 +18,12 @@ const config: CapacitorConfig = {
         biometricAuth: false,
         biometricTitle: "Unlock WholesalePOS"
       }
+    },
+    LocalNotifications: {
+      smallIcon: "ic_launcher_foreground",
+      iconColor: "#176b54"
     }
   }
 };
 
 export default config;
-
