@@ -22,7 +22,7 @@ export function CashDrawerView() {
   const [openingNotes, setOpeningNotes] = useState("");
   const [movementType, setMovementType] = useState<"CASH_IN" | "CASH_OUT" | null>(null);
   const [movementAmount, setMovementAmount] = useState(0);
-  const [movementReason, setMovementReason] = useState(movementReasons[0]);
+  const [movementReason, setMovementReason] = useState("Petty cash");
   const [movementNotes, setMovementNotes] = useState("");
   const [closing, setClosing] = useState(false);
   const [manualActual, setManualActual] = useState(0);

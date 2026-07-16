@@ -5,8 +5,8 @@ describe("offline database migrations", () => {
   const sql = migrations.map((migration) => migration.sql).join("\n").toLowerCase();
 
   it("uses ordered, non-destructive migration versions", () => {
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
-    expect(currentSchemaVersion).toBe(4);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5]);
+    expect(currentSchemaVersion).toBe(5);
     expect(sql).not.toMatch(/\bdrop\s+(table|column|index)\b/);
   });
 
@@ -28,9 +28,11 @@ describe("offline database migrations", () => {
     expect(sql).toContain("cash_movements_refund_once_idx");
   });
 
-  it("removes inventory access from the migrated cashier role", () => {
-    const cashierUpdate = sql.match(/update roles set permissions_json='([^']+)' where id='role_cashier'/)?.[1] ?? "";
+  it("gives cashiers read-only alerts without inventory access", () => {
+    const cashierUpdates = [...sql.matchAll(/update roles set permissions_json='([^']+)' where id='role_cashier'/g)];
+    const cashierUpdate = cashierUpdates[cashierUpdates.length - 1]?.[1] ?? "";
     expect(cashierUpdate).toContain("cash_drawer.use");
+    expect(cashierUpdate).toContain("inventory.alerts.view");
     expect(cashierUpdate).not.toContain("inventory.view");
     expect(cashierUpdate).not.toContain("inventory.manage");
   });

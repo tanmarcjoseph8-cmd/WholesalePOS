@@ -2,26 +2,27 @@
 
 Verified through 16 July 2026.
 
-Version 0.4.0 adds the offline cash drawer lifecycle, cash sale/refund ledger
-links, denomination close, discrepancy review, reconciliation reporting, and
-cashier-safe navigation. Cashier mode no longer exposes Inventory or its write
-controls.
+Version 0.4.1 gives cashiers read-only access to the specific products that are
+low or out of stock. Dashboard and Alerts show the product name, exact available
+quantity and unit, threshold, warehouse, and status. Inventory navigation and
+all product or stock write controls remain inaccessible to cashiers.
 
 ## Automated checks
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 13 files, 41 tests passed for cash reconciliation and authorization,
+- Vitest: 14 files, 43 tests passed for cash reconciliation and authorization,
   reporting ranges and totals, finalized
   sale filtering, PDF pagination and sharing, alert transitions, notification
   permissions/deep links, inventory events, migrations, calculations, security,
-  product activity mapping, and legacy WebView compatibility.
+  product activity mapping, cashier stock-alert authorization, and legacy
+  WebView compatibility.
 - Vite production build targeting Chrome 61-era WebView syntax: passed.
 - Capacitor Android sync: passed.
 - Gradle native unit test: passed.
 - Android 10 instrumentation test confirming no internet permission: passed.
 - Gradle debug APK, signed release APK, and signed release AAB: passed.
-- Version 0.4.0 installed in place on the Android 10 emulator; migration 4
+- Version 0.4.1 installed in place on the Android 10 emulator; migration 5
   completed, the existing local account remained, and the app returned to login
   with no fatal JavaScript or SQLite error.
 - Release APK signature: APK Signature Scheme v2, RSA 3072.
@@ -51,8 +52,8 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The current release artifact is `WholesalePOS-Offline-0.4.0-release.apk`, version
-code 8. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+The current release artifact is `WholesalePOS-Offline-0.4.1-release.apk`, version
+code 9. It verifies with APK Signature Scheme v2 and the existing RSA 3072
 WholesalePOS release certificate.
 
 ## Fire OS 7 status

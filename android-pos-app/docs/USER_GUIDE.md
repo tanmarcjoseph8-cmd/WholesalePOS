@@ -74,17 +74,21 @@ best sellers, and optional transaction details. Generate a PDF, preview it with
 an installed PDF viewer, or use Android Share to save, send, or print it.
 
 The Dashboard **Products needing stock** list names every product currently low
-or out of stock and shows its available quantity and threshold. Tap a product to
-open it directly in Inventory. New in-app alert messages name up to three
-affected products and show how much remains; the Alerts screen keeps the complete
-list when more products are affected at once.
+or out of stock and shows its exact available quantity, unit, warehouse, and
+threshold. Managers and owners can tap a product to open it directly in
+Inventory. Cashiers see the same specific stock details as a read-only list.
+New in-app alert messages name up to three affected products and show how much
+remains; the Alerts screen keeps the complete list when more products are
+affected at once.
 
 Open **Alerts** to review unread and historical low-stock or out-of-stock events.
-Opening an alert marks it read and opens the affected product. Use **Mark all
-read** or **Clear read** as needed. Clearing hides notification history but does
-not remove products, stock movements, or current stock status. Restocking an item
-returns it to normal; if it later crosses the threshold again, a new alert is
-created.
+Each entry identifies the product, exact available quantity and unit, threshold,
+warehouse, and status. Opening an alert marks it read; managers and owners also
+open the affected Inventory item, while cashiers remain in the read-only Alerts
+screen. Use **Mark all read** or **Clear read** as needed. Clearing hides
+notification history but does not remove products, stock movements, or current
+stock status. Restocking an item returns it to normal; if it later crosses the
+threshold again, a new alert is created.
 
 ## Daily close
 
@@ -96,8 +100,10 @@ review. Then export the day's sales report, review low stock, create a full
 backup, and move that backup to another trusted device or drive. Do not keep the
 only backup on the POS tablet.
 
-Cashiers see and close only their own drawer sessions. The Inventory screen,
-product edit/deactivate controls, stock adjustment form, Alerts, Settings, and
-Reports are not shown in Cashier mode. Product search remains available in POS
-and Restaurant so cashiers can sell active stock. Inventory and catalog write
-services independently enforce management permission.
+Cashiers see and close only their own drawer sessions. They can review the exact
+products that are low or out of stock from the Dashboard and Alerts screens, but
+cannot open Inventory from those lists. The Inventory screen, product
+edit/deactivate controls, stock adjustment form, Settings, and Reports are not
+shown in Cashier mode. Product search remains available in POS and Restaurant so
+cashiers can sell active stock. Inventory and catalog write services
+independently enforce management permission.

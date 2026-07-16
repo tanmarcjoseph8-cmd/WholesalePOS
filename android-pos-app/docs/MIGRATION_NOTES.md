@@ -25,3 +25,9 @@ payments, refunds, products, and stock records are not recalculated or rewritten
 The migration also removes Inventory access from the built-in Cashier role and
 adds the limited `cash_drawer.use` permission. Owner permissions remain `*`;
 Manager receives drawer use, management, review, and report permissions.
+
+Version 0.4.1 adds migration 5. It grants the built-in Cashier role the limited
+`inventory.alerts.view` permission so cashiers can identify the exact products
+that are low or out of stock. It does not grant `inventory.view` or
+`inventory.manage`, so cashiers still cannot open Inventory, edit products,
+import products, or change stock. No operational records are rewritten.

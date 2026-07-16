@@ -34,8 +34,8 @@ const createsAlertSql = `next_status<>'NORMAL' AND (
 )`;
 
 function requireInventoryPermission(actor: LocalUser) {
-  if (!actor.permissions.includes("*") && !actor.permissions.includes("inventory.view") && !actor.permissions.includes("inventory.manage")) {
-    throw new Error("Inventory permission is required.");
+  if (!actor.permissions.includes("*") && !actor.permissions.includes("inventory.alerts.view") && !actor.permissions.includes("inventory.view") && !actor.permissions.includes("inventory.manage")) {
+    throw new Error("Inventory alert permission is required.");
   }
 }
 

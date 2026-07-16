@@ -30,7 +30,7 @@ const views = [
   { id: "inventory" as const, label: "Inventory", icon: Boxes, permission: "inventory.view" },
   { id: "sales" as const, label: "Sales", icon: BarChart3 },
   { id: "reports" as const, label: "Reports", icon: ClipboardList, permission: "reports.view" },
-  { id: "alerts" as const, label: "Alerts", icon: BellRing, permission: "inventory.view" },
+  { id: "alerts" as const, label: "Alerts", icon: BellRing, permission: "inventory.alerts.view" },
   { id: "settings" as const, label: "Settings", icon: Settings, permission: "settings.manage" }
 ];
 
@@ -75,7 +75,9 @@ export function App() {
     const openInventoryAlert = (event: Event) => {
       const detail = (event as CustomEvent<{ productId?: string; alertId?: string }>).detail;
       const canViewInventory = Boolean(user && (user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage")));
+      const canViewAlerts = Boolean(user && (canViewInventory || user.permissions.includes("inventory.alerts.view")));
       if (detail?.productId && canViewInventory) { setInventoryFocusId(detail.productId); setPendingAlertId(detail.alertId ?? null); setView("inventory"); }
+      else if (detail?.productId && canViewAlerts) { setPendingAlertId(detail.alertId ?? null); setView("alerts"); }
     };
     const alertsCreated = (event: Event) => {
       const alerts = (event as CustomEvent<{ alerts?: Parameters<typeof inventoryAlertMessage>[0] }>).detail.alerts ?? [];
@@ -88,14 +90,16 @@ export function App() {
     window.addEventListener("pos:inventory-alerts-created", alertsCreated);
     const pendingTarget = user ? offlineApp.inventoryNotifications.consumePendingTarget() : null;
     const canViewInventory = Boolean(user && (user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage")));
+    const canViewAlerts = Boolean(user && (canViewInventory || user.permissions.includes("inventory.alerts.view")));
     if (pendingTarget && canViewInventory) { setInventoryFocusId(pendingTarget.productId); setPendingAlertId(pendingTarget.alertId ?? null); setView("inventory"); }
+    else if (pendingTarget && canViewAlerts) { setPendingAlertId(pendingTarget.alertId ?? null); setView("alerts"); }
     return () => { window.removeEventListener("pos:confirm-leave", confirmLeave); window.removeEventListener("pos:open-inventory-alert", openInventoryAlert); window.removeEventListener("pos:inventory-alerts-created", alertsCreated); void lifecycleService.removeAll(); };
   }, [bootState, user]);
 
   useEffect(() => {
     if (!user || !settings) { setUnreadAlerts(0); return; }
-    const canViewInventory = user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage");
-    if (!canViewInventory) return;
+    const canViewAlerts = user.permissions.includes("*") || user.permissions.includes("inventory.alerts.view") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage");
+    if (!canViewAlerts) return;
     void offlineApp.inventoryAlerts.unreadCount(user).then(setUnreadAlerts).catch(() => setUnreadAlerts(0));
     void offlineApp.inventoryNotifications.activate(settings).then(() => offlineApp.inventoryAlerts.publishPendingSystemNotifications());
   }, [user, settings, revision]);
@@ -130,6 +134,7 @@ export function App() {
     if (!("permission" in entry) || !entry.permission) return true;
     if (user.permissions.includes("*") || user.permissions.includes(entry.permission)) return true;
     if (entry.permission === "cash_drawer.use" && user.permissions.includes("cash_drawer.manage")) return true;
+    if (entry.permission === "inventory.alerts.view" && (user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage"))) return true;
     return entry.permission === "inventory.view" && user.permissions.includes("inventory.manage");
   });
   const effectiveView = allowedViews.some((entry) => entry.id === view) ? view : "dashboard";

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, CheckCheck, ExternalLink, Search, Trash2 } from "lucide-react";
+import { Bell, BellOff, Check, CheckCheck, ExternalLink, Search, Trash2 } from "lucide-react";
 import { formatQuantity, type InventoryAlertRecord, type InventoryStatusRecord } from "../../domain/models";
 import { useOfflineApp } from "../app-context";
 
@@ -11,6 +11,7 @@ export function AlertsView() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const canOpenInventory = user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage");
 
   useEffect(() => {
     let active = true;
@@ -37,7 +38,8 @@ export function AlertsView() {
 
   async function openAlert(alert: InventoryAlertRecord) {
     if (!alert.isRead) await app.inventoryAlerts.markRead(user, alert.id);
-    openInventoryProduct(alert.productId);
+    if (canOpenInventory) openInventoryProduct(alert.productId);
+    else { refresh(); notify(`${alert.productName} marked read.`, "success"); }
   }
 
   return (
@@ -47,8 +49,8 @@ export function AlertsView() {
       <div className="segmented"><button className={tab === "alerts" ? "active" : ""} onClick={() => setTab("alerts")}>Alert history</button><button className={tab === "status" ? "active" : ""} onClick={() => setTab("status")}>Current stock status</button></div>
       <label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product" /></label>
       {loading ? <p className="data-panel loading">Loading inventory alerts...</p> : null}
-      {!loading && tab === "alerts" ? <section className="data-panel alert-list">{filteredAlerts.map((alert) => <article className={`${alert.isRead ? "read" : "unread"} ${alert.isResolved ? "resolved" : "active"}`} key={alert.id}><div className={`alert-icon ${alert.alertType === "OUT_OF_STOCK" ? "danger" : "warning"}`}>{alert.alertType === "OUT_OF_STOCK" ? <BellOff size={20} /> : <Bell size={20} />}</div><div className="alert-copy"><div><strong>{alert.alertType === "OUT_OF_STOCK" ? "Out of stock" : "Low stock"}: {alert.productName}</strong><span className={`status-label ${alert.alertType.toLowerCase()}`}>{alert.isResolved ? "Resolved" : alert.alertType.replaceAll("_", " ")}</span></div><p>{formatQuantity(alert.currentQuantityMicro)} {alert.inventoryUnit.toLowerCase()} available | threshold {formatQuantity(alert.thresholdMicro)} | {alert.warehouseName}</p><small>{new Date(alert.createdAt).toLocaleString("en-PH")}{alert.isRead ? " | Read" : " | Unread"}</small></div><button aria-label={`Open ${alert.productName} in inventory`} title="Open inventory item" onClick={() => void openAlert(alert)}><ExternalLink size={19} /></button></article>)}{!filteredAlerts.length ? <div className="empty-state"><Bell size={28} /><strong>No inventory alerts</strong><p>New low-stock and out-of-stock transitions will appear here.</p></div> : null}</section> : null}
-      {!loading && tab === "status" ? <section className="data-panel stock-status-list"><div className="table-scroll"><table><thead><tr><th>Product</th><th>Location</th><th>Available</th><th>Threshold</th><th>Status</th><th /></tr></thead><tbody>{filteredStatuses.map((status) => <tr key={`${status.productId}-${status.warehouseId}`}><td><strong>{status.productName}</strong></td><td>{status.warehouseName}</td><td>{formatQuantity(status.currentQuantityMicro)} {status.inventoryUnit.toLowerCase()}</td><td>{formatQuantity(status.thresholdMicro)}</td><td><span className={`status-label ${status.status.toLowerCase()}`}>{status.status.replaceAll("_", " ")}</span></td><td><button className="table-icon-button" aria-label={`Open ${status.productName}`} onClick={() => openInventoryProduct(status.productId)}><ExternalLink size={18} /></button></td></tr>)}</tbody></table></div>{!filteredStatuses.length ? <p className="empty-state">No matching products.</p> : null}</section> : null}
+      {!loading && tab === "alerts" ? <section className="data-panel alert-list">{filteredAlerts.map((alert) => <article className={`${alert.isRead ? "read" : "unread"} ${alert.isResolved ? "resolved" : "active"}`} key={alert.id}><div className={`alert-icon ${alert.alertType === "OUT_OF_STOCK" ? "danger" : "warning"}`}>{alert.alertType === "OUT_OF_STOCK" ? <BellOff size={20} /> : <Bell size={20} />}</div><div className="alert-copy"><div><strong>{alert.alertType === "OUT_OF_STOCK" ? "Out of stock" : "Low stock"}: {alert.productName}</strong><span className={`status-label ${alert.alertType.toLowerCase()}`}>{alert.isResolved ? "Resolved" : alert.alertType.replaceAll("_", " ")}</span></div><p>{formatQuantity(alert.currentQuantityMicro)} {alert.inventoryUnit.toLowerCase()} available | threshold {formatQuantity(alert.thresholdMicro)} | {alert.warehouseName}</p><small>{new Date(alert.createdAt).toLocaleString("en-PH")}{alert.isRead ? " | Read" : " | Unread"}</small></div>{canOpenInventory || !alert.isRead ? <button aria-label={canOpenInventory ? `Open ${alert.productName} in inventory` : `Mark ${alert.productName} alert read`} title={canOpenInventory ? "Open inventory item" : "Mark alert read"} onClick={() => void openAlert(alert)}>{canOpenInventory ? <ExternalLink size={19} /> : <Check size={19} />}</button> : <span className="alert-action-placeholder" aria-hidden="true" />}</article>)}{!filteredAlerts.length ? <div className="empty-state"><Bell size={28} /><strong>No inventory alerts</strong><p>New low-stock and out-of-stock transitions will appear here.</p></div> : null}</section> : null}
+      {!loading && tab === "status" ? <section className="data-panel stock-status-list"><div className="table-scroll"><table><thead><tr><th>Product</th><th>Location</th><th>Available</th><th>Threshold</th><th>Status</th>{canOpenInventory ? <th aria-label="Actions" /> : null}</tr></thead><tbody>{filteredStatuses.map((status) => <tr key={`${status.productId}-${status.warehouseId}`}><td><strong>{status.productName}</strong></td><td>{status.warehouseName}</td><td>{formatQuantity(status.currentQuantityMicro)} {status.inventoryUnit.toLowerCase()}</td><td>{formatQuantity(status.thresholdMicro)}</td><td><span className={`status-label ${status.status.toLowerCase()}`}>{status.status.replaceAll("_", " ")}</span></td>{canOpenInventory ? <td><button className="table-icon-button" aria-label={`Open ${status.productName}`} onClick={() => openInventoryProduct(status.productId)}><ExternalLink size={18} /></button></td> : null}</tr>)}</tbody></table></div>{!filteredStatuses.length ? <p className="empty-state">No matching products.</p> : null}</section> : null}
     </section>
   );
 }

@@ -467,6 +467,13 @@ ALTER TABLE refunds ADD COLUMN cash_session_id TEXT REFERENCES cash_sessions(id)
 UPDATE roles SET permissions_json='["sales.manage","sales.refund","sales.void","products.manage","inventory.manage","orders.manage","tables.manage","reports.view","settings.manage","cash_drawer.use","cash_drawer.manage","cash_drawer.review","cash_drawer.report"]' WHERE id='role_manager';
 UPDATE roles SET permissions_json='["sales.manage","orders.manage","products.view","cash_drawer.use"]' WHERE id='role_cashier';
 `
+  },
+  {
+    version: 5,
+    name: "cashier_readonly_stock_alerts",
+    sql: `
+UPDATE roles SET permissions_json='["sales.manage","orders.manage","products.view","inventory.alerts.view","cash_drawer.use"]' WHERE id='role_cashier';
+`
   }
 ];
 

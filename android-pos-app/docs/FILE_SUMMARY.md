@@ -28,6 +28,8 @@ Windows application files changed: **none**.
 - `src/services/cash-drawer-service.ts` and its tests: drawer lifecycle,
   immutable movements, session ownership, corrections, review, and transaction
   linkage for cash sales and refunds.
+- `src/services/inventory-alert-service-access.test.ts`: read-only cashier stock
+  alert authorization and rejection of users without alert permission.
 - `src/platform` TypeScript files: Android lifecycle, back button, file picker,
   filesystem, share, legacy WebView compatibility, and platform boundaries.
 - `src/ui/App.tsx`, `app-context.ts`, `AuthScreen.tsx`, `ConfirmDialog.tsx`:

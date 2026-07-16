@@ -26,7 +26,9 @@ Sales reports therefore show cash drawer reconciliation separately from revenue.
   movement with a compensating ledger entry, and review differences.
 - Owner: all manager capabilities through the owner wildcard permission.
 
-Cashier mode does not expose Inventory, Alerts, Settings, Reports, product edit,
+Cashier mode exposes read-only low-stock details on Dashboard and Alerts,
+including the specific product, available quantity, unit, threshold, warehouse,
+and status. It does not expose Inventory, Settings, Reports, product edit,
 product deactivate, import, or stock adjustment controls. Backend services still
 reject unauthorized inventory and catalog writes if UI navigation is bypassed.
 
@@ -40,5 +42,6 @@ Closing stores the expected and actual snapshot plus denomination counts. Histor
 is never physically deleted and is included in full database backups.
 
 Install updates with the same Android package ID and signing key. Migration 4
-adds the cash tables without resetting existing data. Always make a full backup
+adds the cash tables without resetting existing data, and migration 5 grants the
+built-in Cashier role read-only stock alert access. Always make a full backup
 before updating a live tablet.
