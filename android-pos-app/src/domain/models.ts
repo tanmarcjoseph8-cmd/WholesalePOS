@@ -174,6 +174,20 @@ export type InventoryStatusRecord = {
   thresholdMicro: number;
 };
 
+export type ProductActivityRecord = {
+  id: string;
+  kind: "PRODUCT" | "STOCK";
+  action: string;
+  productId: string;
+  productName: string;
+  inventoryUnit: UnitCode;
+  quantityMicro: number | null;
+  actorName: string | null;
+  reason: string | null;
+  referenceType: string | null;
+  createdAt: string;
+};
+
 export function createUuid() {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
 

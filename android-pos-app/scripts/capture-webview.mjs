@@ -53,6 +53,29 @@ if (viewportWidth > 0 && viewportHeight > 0) {
   });
 }
 
+const layoutCheck = await call("Runtime.evaluate", {
+  expression: `(() => {
+    const host = document.createElement('div');
+    host.innerHTML = '<aside class="sidebar"></aside><main class="app-content"></main><header class="mobile-header"></header>';
+    document.body.append(host);
+    const sidebar = host.querySelector('.sidebar');
+    const content = host.querySelector('.app-content');
+    const mobileHeader = host.querySelector('.mobile-header');
+    const result = {
+      contentMarginLeft: getComputedStyle(content).marginLeft,
+      height: innerHeight,
+      mobileHeaderDisplay: getComputedStyle(mobileHeader).display,
+      portraitTabletRule: matchMedia('(orientation: portrait) and (max-width: 1100px)').matches,
+      sidebarDisplay: getComputedStyle(sidebar).display,
+      width: innerWidth
+    };
+    host.remove();
+    return result;
+  })()`,
+  returnByValue: true
+});
+console.log(JSON.stringify(layoutCheck.result?.value ?? null));
+
 const expression = `(async () => {
   const module = await import('/assets/${html2CanvasFile}');
   const canvas = await module.default(document.documentElement, {

@@ -2,17 +2,18 @@
 
 Verified through 16 July 2026.
 
-Version 0.3.0 adds the centralized Android presentation system and responsive UI
-redesign. Its before/after checks are recorded in `UI_REDESIGN_VERIFICATION.md`.
+Version 0.3.1 extends the responsive shell to portrait tablets and adds a
+permanent product activity tracker backed by existing audit and stock movement
+records. The broader redesign checks are recorded in `UI_REDESIGN_VERIFICATION.md`.
 
 ## Automated checks
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 10 files, 29 tests passed for reporting ranges and totals, finalized
+- Vitest: 11 files, 30 tests passed for reporting ranges and totals, finalized
   sale filtering, PDF pagination and sharing, alert transitions, notification
   permissions/deep links, inventory events, migrations, calculations, security,
-  and legacy WebView compatibility.
+  product activity mapping, and legacy WebView compatibility.
 - Vite production build targeting Chrome 61-era WebView syntax: passed.
 - Capacitor Android sync: passed.
 - Gradle native unit test: passed.
@@ -45,8 +46,8 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The current release artifact is `WholesalePOS-Offline-0.3.0-release.apk`, version
-code 5. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+The current release artifact is `WholesalePOS-Offline-0.3.1-release.apk`, version
+code 6. It verifies with APK Signature Scheme v2 and the existing RSA 3072
 WholesalePOS release certificate.
 
 ## Fire OS 7 status

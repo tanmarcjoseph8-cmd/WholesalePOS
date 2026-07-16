@@ -138,6 +138,14 @@ export class ImportExportService {
           if (row.barcode) await this.db.run("INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", [createId("barcode"), productId, row.barcode, now], false);
           created += 1;
         }
+        await audit(this.db, {
+          actorId: actor.id,
+          action: existingId ? "PRODUCT_UPDATED" : "PRODUCT_CREATED",
+          entityType: "Product",
+          entityId: productId,
+          reason: `Imported from ${preview.sourceName}`,
+          metadata: { sku: row.sku, name: row.name, importBatchId: batchId }
+        });
         if (row.startingStockMicro > 0) {
           const stock = await this.db.query<{ quantity_micro: number }>("SELECT quantity_micro FROM inventory_stock WHERE product_id=? AND warehouse_id='warehouse_main'", [productId]);
           const previousStock = Number(stock[0]?.quantity_micro ?? 0);

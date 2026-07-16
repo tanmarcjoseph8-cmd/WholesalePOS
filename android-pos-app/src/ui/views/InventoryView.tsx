@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { FileSpreadsheet, Pencil, Plus, RefreshCw, Search, Tag, Trash2, X } from "lucide-react";
-import { formatMoney, formatQuantity, inventoryUnits, QUANTITY_SCALE, type ProductInput, type ProductRecord } from "../../domain/models";
+import { FileSpreadsheet, History, Pencil, Plus, RefreshCw, Search, Tag, Trash2, X } from "lucide-react";
+import { formatMoney, formatQuantity, inventoryUnits, QUANTITY_SCALE, type ProductActivityRecord, type ProductInput, type ProductRecord } from "../../domain/models";
 import type { ImportPreview } from "../../services/import-export-service";
 import { useOfflineApp } from "../app-context";
 
@@ -17,6 +17,26 @@ function isLowStock(product: ProductRecord, defaultThresholdMicro: number) {
   return product.availableMicro <= 0 || (threshold > 0 && product.availableMicro <= threshold);
 }
 
+function activityLabel(action: string) {
+  const labels: Record<string, string> = {
+    PRODUCT_CREATED: "Product added",
+    PRODUCT_UPDATED: "Product edited",
+    PRODUCT_DEACTIVATED: "Product removed",
+    STOCK_IN: "Restocked",
+    STOCK_OUT: "Stock removed",
+    ADJUSTMENT: "Count adjusted",
+    SALE: "Sold",
+    RETURN: "Returned"
+  };
+  return labels[action] ?? action.replaceAll("_", " ").toLowerCase();
+}
+
+function activityTone(action: string) {
+  if (["PRODUCT_DEACTIVATED", "STOCK_OUT", "SALE"].includes(action)) return "negative";
+  if (["PRODUCT_CREATED", "STOCK_IN", "RETURN"].includes(action)) return "positive";
+  return "neutral";
+}
+
 export function InventoryView() {
   const { app, user, revision, refresh, notify, inventoryFocusId, clearInventoryFocus } = useOfflineApp();
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -31,8 +51,25 @@ export function InventoryView() {
   const [importMode, setImportMode] = useState<"SKIP" | "UPDATE">("SKIP");
   const [busy, setBusy] = useState(false);
   const [defaultThresholdMicro, setDefaultThresholdMicro] = useState(0);
+  const [activity, setActivity] = useState<ProductActivityRecord[]>([]);
+  const [activityFilter, setActivityFilter] = useState<"ALL" | ProductActivityRecord["kind"]>("ALL");
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   useEffect(() => { void Promise.all([app.catalog.listProducts(search, true), app.catalog.listCategories(), app.settingsReports.getSettings()]).then(([items, nextCategories, settings]) => { setProducts(items); setCategories(nextCategories); setDefaultThresholdMicro(settings.defaultLowStockThresholdMicro); setStockProductId((current) => current || items[0]?.id || ""); }); }, [app, revision, search]);
+  useEffect(() => {
+    let cancelled = false;
+    setActivityLoading(true);
+    setActivityError(null);
+    void app.inventory.listProductActivity(500).then((items) => {
+      if (!cancelled) setActivity(items);
+    }).catch((caught: unknown) => {
+      if (!cancelled) setActivityError(caught instanceof Error ? caught.message : "Product activity could not be loaded.");
+    }).finally(() => {
+      if (!cancelled) setActivityLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [app, revision]);
   useEffect(() => {
     if (!inventoryFocusId) return;
     void app.catalog.getProduct(inventoryFocusId).then((product) => {
@@ -43,6 +80,7 @@ export function InventoryView() {
     }).catch((caught: unknown) => notify(caught instanceof Error ? caught.message : "The inventory item could not be opened.", "error"));
   }, [app, inventoryFocusId, clearInventoryFocus, notify]);
   const selectedStockProduct = useMemo(() => products.find((product) => product.id === stockProductId), [products, stockProductId]);
+  const filteredActivity = useMemo(() => activityFilter === "ALL" ? activity : activity.filter((item) => item.kind === activityFilter), [activity, activityFilter]);
 
   async function saveProduct(event: FormEvent) {
     event.preventDefault();
@@ -105,6 +143,15 @@ export function InventoryView() {
         </section>
         <form className="data-panel stock-form" onSubmit={saveStock}><h3>Stock movement</h3><label>Product<select value={stockProductId} onChange={(event) => setStockProductId(event.target.value)}>{products.filter((product) => product.status === "ACTIVE").map((product) => <option value={product.id} key={product.id}>{product.name}</option>)}</select></label><label>Movement<select value={stockType} onChange={(event) => setStockType(event.target.value as typeof stockType)}><option value="STOCK_IN">Add stock</option><option value="STOCK_OUT">Remove stock</option><option value="ADJUSTMENT">Set counted stock</option></select></label><label>{stockType === "ADJUSTMENT" ? "Counted quantity" : "Quantity"}<input type="number" min="0" step="any" value={stockQuantity} onChange={(event) => setStockQuantity(Number(event.target.value))} required /></label><label>Reason<input value={stockReason} onChange={(event) => setStockReason(event.target.value)} minLength={3} required /></label>{selectedStockProduct ? <p className="stock-summary">Current available: <strong>{formatQuantity(selectedStockProduct.availableMicro)} {selectedStockProduct.inventoryUnit.toLowerCase()}</strong></p> : null}<button className="button primary wide" disabled={busy || !stockProductId}><RefreshCw size={18} /> Save stock</button></form>
       </div>
+
+      <section className="data-panel product-activity-panel">
+        <header><div><History size={20} /><div><h3>Product activity</h3><p>Permanent history of product and stock changes.</p></div></div><span>{filteredActivity.length} events</span></header>
+        <div className="activity-toolbar"><div className="segmented" aria-label="Product activity filter"><button className={activityFilter === "ALL" ? "active" : ""} onClick={() => setActivityFilter("ALL")}>All</button><button className={activityFilter === "PRODUCT" ? "active" : ""} onClick={() => setActivityFilter("PRODUCT")}>Products</button><button className={activityFilter === "STOCK" ? "active" : ""} onClick={() => setActivityFilter("STOCK")}>Stock</button></div></div>
+        {activityError ? <p className="error-banner">{activityError}</p> : null}
+        {!activityLoading && !activityError ? <div className="table-scroll"><table className="activity-table"><thead><tr><th>Date</th><th>Product</th><th>Activity</th><th>Quantity change</th><th>By</th><th>Details</th></tr></thead><tbody>{filteredActivity.map((item) => <tr key={`${item.kind}-${item.id}`}><td className="activity-date">{new Date(item.createdAt).toLocaleString("en-PH")}</td><td><strong>{item.productName}</strong></td><td><span className={`activity-action ${activityTone(item.action)}`}>{activityLabel(item.action)}</span></td><td className={`activity-quantity ${item.quantityMicro === null ? "neutral" : item.quantityMicro > 0 ? "positive" : "negative"}`}>{item.quantityMicro === null ? "-" : `${item.quantityMicro > 0 ? "+" : ""}${formatQuantity(item.quantityMicro)} ${item.inventoryUnit.toLowerCase()}`}</td><td>{item.actorName ?? "System"}</td><td>{item.reason ?? (item.kind === "PRODUCT" ? activityLabel(item.action) : "Stock updated")}{item.referenceType ? <small>{item.referenceType}</small> : null}</td></tr>)}</tbody></table></div> : null}
+        {activityLoading ? <p className="empty-state">Loading product activity...</p> : null}
+        {!activityLoading && !activityError && !filteredActivity.length ? <p className="empty-state">No matching product activity yet.</p> : null}
+      </section>
 
       {editor ? <div className="dialog-backdrop"><form className="dialog product-dialog" onSubmit={saveProduct}><div className="dialog-title"><h2>{editor.id ? "Edit product" : "Add product"}</h2><button type="button" aria-label="Close product form" onClick={() => setEditor(null)}><X size={20} /></button></div><div className="form-grid"><label className="span-2">Product name<input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} required /></label><label>SKU optional<input value={editor.sku} onChange={(event) => setEditor({ ...editor, sku: event.target.value })} /></label><label>Barcode optional<input value={editor.barcode ?? ""} onChange={(event) => setEditor({ ...editor, barcode: event.target.value || null })} inputMode="numeric" /></label><label>Category<select value={editor.categoryId ?? ""} onChange={(event) => setEditor({ ...editor, categoryId: event.target.value || null })}><option value="">Uncategorized</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label><label>Status<select value={editor.status} onChange={(event) => setEditor({ ...editor, status: event.target.value as ProductInput["status"] })}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></label><label>Inventory unit<select value={editor.inventoryUnit} onChange={(event) => setEditor({ ...editor, inventoryUnit: event.target.value as ProductInput["inventoryUnit"] })}>{inventoryUnits.map((unit) => <option value={unit} key={unit}>{unit}</option>)}</select></label><label>Selling unit<select value={editor.sellingUnit} onChange={(event) => setEditor({ ...editor, sellingUnit: event.target.value as ProductInput["sellingUnit"] })}>{inventoryUnits.map((unit) => <option value={unit} key={unit}>{unit}</option>)}</select></label><label>Unit conversion to inventory<input type="number" min="0.000001" step="any" value={editor.unitRatioMicro / QUANTITY_SCALE} onChange={(event) => setEditor({ ...editor, unitRatioMicro: Math.round(Number(event.target.value) * QUANTITY_SCALE) })} /></label><label>Package size<input type="number" min="0.000001" step="any" value={editor.packageSizeMicro / QUANTITY_SCALE} onChange={(event) => setEditor({ ...editor, packageSizeMicro: Math.round(Number(event.target.value) * QUANTITY_SCALE) })} /></label><label>Cost price<input type="number" min="0" step="0.01" value={editor.costPriceCents / 100} onChange={(event) => setEditor({ ...editor, costPriceCents: Math.round(Number(event.target.value) * 100) })} /></label><label>Retail price<input type="number" min="0" step="0.01" value={editor.retailPriceCents / 100} onChange={(event) => setEditor({ ...editor, retailPriceCents: Math.round(Number(event.target.value) * 100) })} /></label><label>Wholesale price<input type="number" min="0" step="0.01" value={editor.wholesalePriceCents / 100} onChange={(event) => setEditor({ ...editor, wholesalePriceCents: Math.round(Number(event.target.value) * 100) })} /></label><label>Wholesale starts at<input type="number" min="0" step="any" value={editor.wholesaleThresholdMicro / QUANTITY_SCALE} onChange={(event) => setEditor({ ...editor, wholesaleThresholdMicro: Math.round(Number(event.target.value) * QUANTITY_SCALE) })} /></label><label>Tax (%)<input type="number" min="0" max="100" step="0.01" value={editor.taxBasisPoints / 100} onChange={(event) => setEditor({ ...editor, taxBasisPoints: Math.round(Number(event.target.value) * 100) })} /></label><label>Low-stock threshold<input type="number" min="0" step="any" value={editor.minimumStockMicro / QUANTITY_SCALE} onChange={(event) => setEditor({ ...editor, minimumStockMicro: Math.round(Number(event.target.value) * QUANTITY_SCALE) })} /></label></div><div className="dialog-actions"><button type="button" className="button ghost" onClick={() => setEditor(null)}>Cancel</button><button className="button primary" disabled={busy}>Save product</button></div></form></div> : null}
 

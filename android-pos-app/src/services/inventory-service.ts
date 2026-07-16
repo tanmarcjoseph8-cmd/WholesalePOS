@@ -1,5 +1,5 @@
 import type { LocalDatabase } from "../data/database";
-import { createId, nowIso, type LocalUser } from "../domain/models";
+import { createId, nowIso, type LocalUser, type ProductActivityRecord } from "../domain/models";
 import { audit } from "./service-helpers";
 
 export type StockMovementInput = {
@@ -57,5 +57,61 @@ export class InventoryService {
       [Math.min(Math.max(limit, 1), 1000)]
     );
   }
-}
 
+  async listProductActivity(limit = 500): Promise<ProductActivityRecord[]> {
+    const rows = await this.db.query<{
+      activity_id: string;
+      kind: ProductActivityRecord["kind"];
+      action: string;
+      product_id: string;
+      product_name: string;
+      inventory_unit: ProductActivityRecord["inventoryUnit"];
+      quantity_micro: number | null;
+      actor_name: string | null;
+      reason: string | null;
+      reference_type: string | null;
+      created_at: string;
+    }>(
+      `SELECT activity_id, kind, action, product_id, product_name, inventory_unit,
+              quantity_micro, actor_name, reason, reference_type, created_at
+       FROM (
+         SELECT a.id AS activity_id, 'PRODUCT' AS kind, a.action,
+                a.entity_id AS product_id, COALESCE(p.name, 'Unknown product') AS product_name,
+                COALESCE(p.inventory_unit, 'PIECE') AS inventory_unit, NULL AS quantity_micro,
+                u.name AS actor_name, a.reason, NULL AS reference_type, a.created_at
+         FROM audit_logs a
+         LEFT JOIN products p ON p.id = a.entity_id
+         LEFT JOIN users u ON u.id = a.actor_id
+         WHERE a.entity_type = 'Product'
+           AND a.action IN ('PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DEACTIVATED')
+
+         UNION ALL
+
+         SELECT m.id AS activity_id, 'STOCK' AS kind, m.type AS action,
+                m.product_id, p.name AS product_name, p.inventory_unit,
+                m.quantity_micro, u.name AS actor_name, m.reason,
+                m.reference_type, m.created_at
+         FROM inventory_movements m
+         JOIN products p ON p.id = m.product_id
+         LEFT JOIN users u ON u.id = m.actor_id
+       ) activity
+       ORDER BY created_at DESC, activity_id DESC
+       LIMIT ?`,
+      [Math.min(Math.max(limit, 1), 1000)]
+    );
+
+    return rows.map((row) => ({
+      id: row.activity_id,
+      kind: row.kind,
+      action: row.action,
+      productId: row.product_id,
+      productName: row.product_name,
+      inventoryUnit: row.inventory_unit,
+      quantityMicro: row.quantity_micro === null ? null : Number(row.quantity_micro),
+      actorName: row.actor_name,
+      reason: row.reason,
+      referenceType: row.reference_type,
+      createdAt: row.created_at
+    }));
+  }
+}

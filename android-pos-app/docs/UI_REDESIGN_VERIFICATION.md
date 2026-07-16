@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | ESLint | Pass | Pass |
 | TypeScript project build | Pass | Pass |
-| Vitest | 10 files, 29 tests passed | 10 files, 29 tests passed |
+| Vitest | 10 files, 29 tests passed | 11 files, 30 tests passed |
 | Vite production build | Pass | Pass |
 | Android debug APK | Pass | Pass |
 
@@ -43,6 +43,14 @@ Redesigned:
 - `docs/ui-redesign/after/tablet-inventory.png`
 - `docs/ui-redesign/after/tablet-sales.png`
 - `docs/ui-redesign/after/tablet-reports.png`
+- `docs/ui-redesign/after/portrait-shell-0.3.1.png`
+
+## Portrait tablet check
+
+Version 0.3.1 was rendered at a `900 x 1200` CSS-pixel portrait viewport. The
+computed responsive state was: sidebar `display: none`, mobile header
+`display: flex`, and app content left margin `0px`. This specifically verifies
+that the desktop `248px` sidebar offset does not remain after rotation.
 
 ## Visual test limitation
 

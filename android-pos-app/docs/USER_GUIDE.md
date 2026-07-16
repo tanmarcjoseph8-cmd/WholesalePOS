@@ -17,6 +17,13 @@ Use **Stock in**, **Stock out**, or **Adjust** to change a balance. Every change
 creates a permanent stock movement and audit entry. The app prevents negative
 available stock.
 
+The **Product activity** tracker at the bottom of Inventory combines product
+creation, edits, deactivation, restocks, removals, counted adjustments, sales,
+returns, and imported starting stock. Use **All**, **Products**, or **Stock** to
+filter the history. Each event shows the product, signed quantity change, user,
+reason, source, and local date and time. Product removal is a reversible soft
+deactivation, so its history and past sales remain intact.
+
 Supported units are piece, kilogram, gram, liter, milliliter, meter, centimeter,
 yard, foot, case, and pack. Fractional sales use scaled integer quantities.
 
@@ -49,6 +56,10 @@ through compensating movements.
 The dashboard, inventory, sales, and restaurant views read the same SQLite
 database. Writes trigger an in-app refresh, and reopening the app reloads the
 latest committed data.
+
+In portrait orientation, supported tablets automatically switch to the mobile
+header and bottom navigation and use the full screen width. Landscape restores
+the wider tablet layout when space permits.
 
 Open **Reports** for today, this week, this month, previous periods, or a custom
 date range. Reports use the business timezone configured in **Settings** and use
