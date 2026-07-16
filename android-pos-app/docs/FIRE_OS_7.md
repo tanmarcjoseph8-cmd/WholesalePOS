@@ -1,13 +1,13 @@
 # Fire OS 7 Installation
 
-Version 0.3.2 supports Fire OS 7, which uses Android API 28.
+Version 0.4.0 supports Fire OS 7, which uses Android API 28.
 
 ## Install
 
 1. On the Fire tablet, open **Settings > Security & Privacy**.
 2. Open **Apps from Unknown Sources** or **Install Unknown Apps**.
 3. Allow the browser or Files application that will open the APK.
-4. Transfer `WholesalePOS-Offline-0.3.2-release.apk` to the tablet.
+4. Transfer `WholesalePOS-Offline-0.4.0-release.apk` to the tablet.
 5. Open the APK and choose **Install**.
 6. Open WholesalePOS Offline and complete owner setup.
 7. Create a full backup and move a copy off the tablet.
@@ -17,7 +17,7 @@ sideloading with `adb install`.
 
 ## Updating an existing installation
 
-Install version 0.3.2 over the existing WholesalePOS Offline installation. Do not
+Install version 0.4.0 over the existing WholesalePOS Offline installation. Do not
 uninstall it and do not clear app storage. The package ID and signing certificate
 are unchanged, so an in-place update preserves the local SQLite database.
 

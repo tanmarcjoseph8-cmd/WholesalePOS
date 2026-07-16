@@ -18,17 +18,22 @@ Windows application files changed: **none**.
 
 - `src/domain/models.ts`, `calculations.ts`, `security.ts`: typed records, units,
   integer money/quantity calculations, UUID compatibility, and PBKDF2.
+- `src/domain/cash-drawer.ts`, `cash-drawer.test.ts`: integer cash formulas,
+  PHP denomination definitions, and reconciliation records.
 - `src/domain` test files: calculation and credential tests.
 - `src/data/database.ts`, `migrations.ts`, `migrations.test.ts`: Capacitor SQLite
   adapter, transactions, export/import, schema, and migration checks.
 - `src/services` TypeScript files: auth, catalog, inventory, sales/refunds,
   restaurant, settings/reports, imports/exports, backups, receipts, and auditing.
+- `src/services/cash-drawer-service.ts` and its tests: drawer lifecycle,
+  immutable movements, session ownership, corrections, review, and transaction
+  linkage for cash sales and refunds.
 - `src/platform` TypeScript files: Android lifecycle, back button, file picker,
   filesystem, share, legacy WebView compatibility, and platform boundaries.
 - `src/ui/App.tsx`, `app-context.ts`, `AuthScreen.tsx`, `ConfirmDialog.tsx`:
   session shell and reusable UI behavior.
-- `src/ui/views` TSX files: dashboard, POS, inventory/import, restaurant, sales,
-  reports, users, settings, backups, and exports.
+- `src/ui/views` TSX files: dashboard, POS, cash drawer, inventory/import,
+  restaurant, sales, reports, users, settings, backups, and exports.
 - `src/main.tsx`, `src/styles.css`: application bootstrap and responsive styling.
 
 ## Native Android project
@@ -51,5 +56,5 @@ Windows application files changed: **none**.
 - `docs/BUILD_AND_INSTALL.md`, `USER_GUIDE.md`, `BACKUP_RESTORE.md`,
   `PRINTER_SETUP.md`, `IMPORT_TEMPLATE.md`, `FIRE_OS_7.md`,
   `product-import-template.csv`,
-  `MIGRATION_NOTES.md`, `KNOWN_LIMITATIONS.md`, `TEST_REPORT.md`: build,
+  `MIGRATION_NOTES.md`, `CASH_DRAWER.md`, `KNOWN_LIMITATIONS.md`, `TEST_REPORT.md`: build,
   operation, recovery, import, migration, constraints, and evidence.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Printer, Search, ShoppingCart, Trash2 } from "lucide-react";
+import { Banknote, Minus, Plus, Printer, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { moneyInputToCents, paymentBalance, toBaseQuantity } from "../../domain/calculations";
 import { createId, formatMoney, formatQuantity, QUANTITY_SCALE, type CartLine, type ProductRecord } from "../../domain/models";
 import type { SaleDetail } from "../../services/sales-service";
@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../ConfirmDialog";
 import { SaleReceiptDialog } from "../SaleReceiptDialog";
 
 export function PosView() {
-  const { app, user, revision, refresh, setUnsaved, notify } = useOfflineApp();
+  const { app, user, revision, refresh, setUnsaved, notify, openCashDrawer } = useOfflineApp();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -18,9 +18,11 @@ export function PosView() {
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState<SaleDetail | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [cashDrawerOpen, setCashDrawerOpen] = useState(false);
   const requestKey = useRef(createId("checkout"));
 
   useEffect(() => { void app.catalog.listProducts(search).then(setProducts); }, [app, search, revision]);
+  useEffect(() => { void app.cashDrawer.current(user).then((session) => setCashDrawerOpen(Boolean(session))).catch(() => setCashDrawerOpen(false)); }, [app, user, revision]);
   useEffect(() => { setUnsaved(cart.length > 0); return () => setUnsaved(false); }, [cart.length, setUnsaved]);
 
   const total = useMemo(() => cart.reduce((sum, line) => {
@@ -99,8 +101,9 @@ export function PosView() {
         </div>
         <div className="total-row"><span>Total</span><strong>{formatMoney(total)}</strong></div>
         <div className="payment-grid"><label>Cash<input type="number" min="0" step="0.01" value={cash / 100} onChange={(event) => setCash(moneyInputToCents(event.target.value))} /></label><label>GCash<input type="number" min="0" step="0.01" value={gcash / 100} onChange={(event) => setGcash(moneyInputToCents(event.target.value))} /></label></div>
+        {cash > 0 && !cashDrawerOpen ? <div className="notice-band cash-drawer-notice"><span>Open the cash drawer before accepting cash.</span><button className="button secondary" onClick={openCashDrawer}><Banknote size={17} /> Open drawer</button></div> : null}
         <div className="payment-balance"><div><span>Amount received</span><strong>{formatMoney(payment.paidCents)}</strong></div><div className={payment.changeCents > 0 ? "change" : "due"}><span>{payment.changeCents > 0 ? "Change" : "Amount due"}</span><strong>{formatMoney(payment.changeCents > 0 ? payment.changeCents : payment.dueCents)}</strong></div></div>
-        <button className="button primary wide" disabled={!cart.length || payment.dueCents > 0} onClick={() => setConfirming(true)}>Charge {formatMoney(total)}</button>
+        <button className="button primary wide" disabled={!cart.length || payment.dueCents > 0 || (cash > 0 && !cashDrawerOpen)} onClick={() => setConfirming(true)}>Charge {formatMoney(total)}</button>
         {completed ? <button className="button secondary wide" onClick={() => setReceiptOpen(true)}><Printer size={18} /> View receipt {completed.receiptNumber}</button> : null}
       </aside>
       <ConfirmDialog open={confirming} title="Complete this sale?" confirmLabel={submitting ? "Completing" : `Charge ${formatMoney(total)}`} disabled={submitting} onClose={() => setConfirming(false)} onConfirm={() => void checkout()}><div className="payment-confirm-summary"><span>Total <strong>{formatMoney(total)}</strong></span><span>Received <strong>{formatMoney(payment.paidCents)}</strong></span><span>Change <strong>{formatMoney(payment.changeCents)}</strong></span></div><p>The sale, payments, stock deduction, inventory movements, and receipt will be saved together. Repeated taps cannot create a duplicate sale.</p></ConfirmDialog>

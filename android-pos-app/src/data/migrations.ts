@@ -402,6 +402,71 @@ CREATE INDEX IF NOT EXISTS inventory_alerts_unread_idx ON inventory_alerts(is_re
 CREATE INDEX IF NOT EXISTS inventory_alerts_product_idx ON inventory_alerts(product_id, warehouse_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_alert_state_status_idx ON inventory_alert_state(current_status, updated_at DESC);
 `
+  },
+  {
+    version: 4,
+    name: "offline_cash_drawer_ledger",
+    sql: `
+CREATE TABLE IF NOT EXISTS cash_sessions (
+  id TEXT PRIMARY KEY NOT NULL,
+  request_key TEXT NOT NULL UNIQUE,
+  close_request_key TEXT UNIQUE,
+  register_id TEXT NOT NULL DEFAULT 'device_main',
+  business_date TEXT NOT NULL,
+  opened_by_user_id TEXT NOT NULL REFERENCES users(id),
+  closed_by_user_id TEXT REFERENCES users(id),
+  reviewed_by_user_id TEXT REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED','REVIEW_REQUIRED','REVIEWED')),
+  opening_cash_cents INTEGER NOT NULL CHECK(opening_cash_cents >= 0),
+  expected_cash_cents INTEGER CHECK(expected_cash_cents IS NULL OR expected_cash_cents >= 0),
+  actual_cash_cents INTEGER CHECK(actual_cash_cents IS NULL OR actual_cash_cents >= 0),
+  difference_cents INTEGER,
+  opening_notes TEXT,
+  closing_notes TEXT,
+  denomination_json TEXT,
+  review_notes TEXT,
+  review_resolution TEXT,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT,
+  reviewed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS cash_sessions_one_open_register_idx ON cash_sessions(register_id) WHERE status='OPEN';
+CREATE INDEX IF NOT EXISTS cash_sessions_date_idx ON cash_sessions(business_date DESC, opened_at DESC);
+CREATE INDEX IF NOT EXISTS cash_sessions_user_idx ON cash_sessions(opened_by_user_id, opened_at DESC);
+CREATE INDEX IF NOT EXISTS cash_sessions_status_idx ON cash_sessions(status, opened_at DESC);
+
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id TEXT PRIMARY KEY NOT NULL,
+  request_key TEXT NOT NULL UNIQUE,
+  cash_session_id TEXT NOT NULL REFERENCES cash_sessions(id),
+  type TEXT NOT NULL CHECK(type IN ('SALE','REFUND','CASH_IN','CASH_OUT','CORRECTION_IN','CORRECTION_OUT')),
+  direction INTEGER NOT NULL CHECK(direction IN (-1,1)),
+  amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+  reason TEXT NOT NULL,
+  notes TEXT,
+  related_type TEXT,
+  related_id TEXT,
+  created_by_user_id TEXT NOT NULL REFERENCES users(id),
+  reverses_movement_id TEXT REFERENCES cash_movements(id),
+  reversed_at TEXT,
+  reversed_by_user_id TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS cash_movements_session_idx ON cash_movements(cash_session_id, created_at);
+CREATE INDEX IF NOT EXISTS cash_movements_related_idx ON cash_movements(related_type, related_id);
+CREATE UNIQUE INDEX IF NOT EXISTS cash_movements_sale_once_idx ON cash_movements(related_id, type) WHERE related_type='Sale' AND type='SALE';
+CREATE UNIQUE INDEX IF NOT EXISTS cash_movements_refund_once_idx ON cash_movements(related_id, type) WHERE related_type='Refund' AND type='REFUND';
+
+ALTER TABLE sales ADD COLUMN cash_session_id TEXT REFERENCES cash_sessions(id);
+ALTER TABLE refunds ADD COLUMN cash_session_id TEXT REFERENCES cash_sessions(id);
+
+UPDATE roles SET permissions_json='["sales.manage","sales.refund","sales.void","products.manage","inventory.manage","orders.manage","tables.manage","reports.view","settings.manage","cash_drawer.use","cash_drawer.manage","cash_drawer.review","cash_drawer.report"]' WHERE id='role_manager';
+UPDATE roles SET permissions_json='["sales.manage","orders.manage","products.view","cash_drawer.use"]' WHERE id='role_cashier';
+`
   }
 ];
 

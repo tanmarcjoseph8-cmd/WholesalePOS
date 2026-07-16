@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
-import { BarChart3, Bell, BellRing, Boxes, ClipboardList, LayoutDashboard, LogOut, RefreshCw, Settings, ShoppingCart, Store, Utensils } from "lucide-react";
+import { BarChart3, Bell, BellRing, Boxes, ClipboardList, LayoutDashboard, LogOut, RefreshCw, Settings, ShoppingCart, Store, Utensils, WalletCards } from "lucide-react";
 import type { AppSettings, LocalUser } from "../domain/models";
 import { inventoryAlertMessage } from "../domain/inventory-alerts";
 import { lifecycleService } from "../platform/lifecycle";
@@ -17,19 +17,21 @@ const SalesHistoryView = lazy(() => import("./views/SalesHistoryView").then((mod
 const SettingsView = lazy(() => import("./views/SettingsView").then((module) => ({ default: module.SettingsView })));
 const ReportsView = lazy(() => import("./views/ReportsView").then((module) => ({ default: module.ReportsView })));
 const AlertsView = lazy(() => import("./views/AlertsView").then((module) => ({ default: module.AlertsView })));
+const CashDrawerView = lazy(() => import("./views/CashDrawerView").then((module) => ({ default: module.CashDrawerView })));
 
-type ViewId = "dashboard" | "pos" | "restaurant" | "inventory" | "sales" | "reports" | "alerts" | "settings";
+type ViewId = "dashboard" | "pos" | "restaurant" | "cash-drawer" | "inventory" | "sales" | "reports" | "alerts" | "settings";
 type Toast = { id: number; message: string; tone: "success" | "error" };
 
 const views = [
   { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
   { id: "pos" as const, label: "POS", icon: ShoppingCart },
   { id: "restaurant" as const, label: "Restaurant", icon: Utensils },
-  { id: "inventory" as const, label: "Inventory", icon: Boxes },
+  { id: "cash-drawer" as const, label: "Cash Drawer", icon: WalletCards, permission: "cash_drawer.use" },
+  { id: "inventory" as const, label: "Inventory", icon: Boxes, permission: "inventory.view" },
   { id: "sales" as const, label: "Sales", icon: BarChart3 },
   { id: "reports" as const, label: "Reports", icon: ClipboardList, permission: "reports.view" },
   { id: "alerts" as const, label: "Alerts", icon: BellRing, permission: "inventory.view" },
-  { id: "settings" as const, label: "Settings", icon: Settings }
+  { id: "settings" as const, label: "Settings", icon: Settings, permission: "settings.manage" }
 ];
 
 export function App() {
@@ -72,7 +74,8 @@ export function App() {
     const confirmLeave = () => setLeaveOpen(true);
     const openInventoryAlert = (event: Event) => {
       const detail = (event as CustomEvent<{ productId?: string; alertId?: string }>).detail;
-      if (detail?.productId) { setInventoryFocusId(detail.productId); setPendingAlertId(detail.alertId ?? null); setView("inventory"); }
+      const canViewInventory = Boolean(user && (user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage")));
+      if (detail?.productId && canViewInventory) { setInventoryFocusId(detail.productId); setPendingAlertId(detail.alertId ?? null); setView("inventory"); }
     };
     const alertsCreated = (event: Event) => {
       const alerts = (event as CustomEvent<{ alerts?: Parameters<typeof inventoryAlertMessage>[0] }>).detail.alerts ?? [];
@@ -83,10 +86,11 @@ export function App() {
     window.addEventListener("pos:confirm-leave", confirmLeave);
     window.addEventListener("pos:open-inventory-alert", openInventoryAlert);
     window.addEventListener("pos:inventory-alerts-created", alertsCreated);
-    const pendingTarget = offlineApp.inventoryNotifications.consumePendingTarget();
-    if (pendingTarget) { setInventoryFocusId(pendingTarget.productId); setPendingAlertId(pendingTarget.alertId ?? null); setView("inventory"); }
+    const pendingTarget = user ? offlineApp.inventoryNotifications.consumePendingTarget() : null;
+    const canViewInventory = Boolean(user && (user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage")));
+    if (pendingTarget && canViewInventory) { setInventoryFocusId(pendingTarget.productId); setPendingAlertId(pendingTarget.alertId ?? null); setView("inventory"); }
     return () => { window.removeEventListener("pos:confirm-leave", confirmLeave); window.removeEventListener("pos:open-inventory-alert", openInventoryAlert); window.removeEventListener("pos:inventory-alerts-created", alertsCreated); void lifecycleService.removeAll(); };
-  }, [bootState]);
+  }, [bootState, user]);
 
   useEffect(() => {
     if (!user || !settings) { setUnreadAlerts(0); return; }
@@ -112,7 +116,10 @@ export function App() {
   function refresh() { setRevision((value) => value + 1); }
   function navigate(next: ViewId) { if (next === view) return; if (unsavedRef.current) { pendingView.current = next; setLeaveOpen(true); } else setView(next); }
   function discardAndLeave() { unsavedRef.current = false; setLeaveOpen(false); if (pendingView.current) { setView(pendingView.current); pendingView.current = null; } }
-  function openInventoryProduct(productId: string) { unsavedRef.current = false; setInventoryFocusId(productId); setView("inventory"); }
+  function openInventoryProduct(productId: string) {
+    if (!user || (!user.permissions.includes("*") && !user.permissions.includes("inventory.view") && !user.permissions.includes("inventory.manage"))) { notify("Inventory access is restricted for this account.", "error"); return; }
+    unsavedRef.current = false; setInventoryFocusId(productId); setView("inventory");
+  }
 
   if (bootState === "booting") return <main className="boot-page"><RefreshCw className="spin" size={32} /><strong>Opening secure local database</strong></main>;
   if (bootState === "error") return <main className="boot-page error"><DatabaseError /><h1>WholesalePOS could not start</h1><p>{bootError}</p><button className="button primary" onClick={() => window.location.reload()}>Try again</button></main>;
@@ -122,17 +129,19 @@ export function App() {
     if (settings?.businessMode === "RETAIL" && entry.id === "restaurant") return false;
     if (!("permission" in entry) || !entry.permission) return true;
     if (user.permissions.includes("*") || user.permissions.includes(entry.permission)) return true;
+    if (entry.permission === "cash_drawer.use" && user.permissions.includes("cash_drawer.manage")) return true;
     return entry.permission === "inventory.view" && user.permissions.includes("inventory.manage");
   });
-  const CurrentView = view === "dashboard" ? DashboardView : view === "pos" ? PosView : view === "restaurant" ? RestaurantView : view === "inventory" ? InventoryView : view === "sales" ? SalesHistoryView : view === "reports" ? ReportsView : view === "alerts" ? AlertsView : SettingsView;
+  const effectiveView = allowedViews.some((entry) => entry.id === view) ? view : "dashboard";
+  const CurrentView = effectiveView === "dashboard" ? DashboardView : effectiveView === "pos" ? PosView : effectiveView === "restaurant" ? RestaurantView : effectiveView === "cash-drawer" ? CashDrawerView : effectiveView === "inventory" ? InventoryView : effectiveView === "sales" ? SalesHistoryView : effectiveView === "reports" ? ReportsView : effectiveView === "alerts" ? AlertsView : SettingsView;
 
   return (
-    <AppContext.Provider value={{ app: offlineApp, user, revision, refresh, setUnsaved, notify, inventoryFocusId, openInventoryProduct, clearInventoryFocus: () => setInventoryFocusId(null) }}>
+    <AppContext.Provider value={{ app: offlineApp, user, revision, refresh, setUnsaved, notify, inventoryFocusId, openInventoryProduct, openCashDrawer: () => navigate("cash-drawer"), clearInventoryFocus: () => setInventoryFocusId(null) }}>
       <div className="app-shell">
-        <aside className="sidebar" aria-label="Application navigation"><div className="brand"><div className="brand-symbol"><Store size={21} /></div><div><strong>{settings?.businessName ?? "WholesalePOS"}</strong><span>Offline Android</span></div></div><nav aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} key={id} onClick={() => navigate(id)} title={label}><Icon size={21} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav><div className="account"><div className="account-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.name}</strong><span>{user.role}</span></div><button type="button" aria-label="Lock tablet" title="Lock tablet" onClick={() => { unsavedRef.current = false; setUser(null); setView("dashboard"); }}><LogOut size={20} /></button></div></aside>
+        <aside className="sidebar" aria-label="Application navigation"><div className="brand"><div className="brand-symbol"><Store size={21} /></div><div><strong>{settings?.businessName ?? "WholesalePOS"}</strong><span>Offline Android</span></div></div><nav aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={effectiveView === id ? "active" : ""} aria-current={effectiveView === id ? "page" : undefined} key={id} onClick={() => navigate(id)} title={label}><Icon size={21} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav><div className="account"><div className="account-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.name}</strong><span>{user.role}</span></div><button type="button" aria-label="Lock tablet" title="Lock tablet" onClick={() => { unsavedRef.current = false; setUser(null); setView("dashboard"); }}><LogOut size={20} /></button></div></aside>
         <header className="mobile-header"><div className="brand-symbol"><Store size={20} /></div><strong>{settings?.businessName ?? "WholesalePOS"}</strong>{allowedViews.some((entry) => entry.id === "alerts") ? <button type="button" className="mobile-alert-button" aria-label={`${unreadAlerts} unread inventory alerts`} onClick={() => navigate("alerts")}><Bell size={20} />{unreadAlerts > 0 ? <b>{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button> : null}<button type="button" aria-label="Refresh local data" onClick={refresh}><RefreshCw size={20} /></button></header>
         <main className="app-content"><Suspense fallback={<p className="loading" role="status">Opening local screen...</p>}><CurrentView /></Suspense></main>
-        <nav className="bottom-nav" aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav>
+        <nav className="bottom-nav" aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={effectiveView === id ? "active" : ""} aria-current={effectiveView === id ? "page" : undefined} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav>
         {toast ? <div className={`toast ${toast.tone}`} role="status" key={toast.id}>{toast.message}</div> : null}
         <ConfirmDialog open={leaveOpen} title="Discard unsaved changes?" confirmLabel="Discard changes" destructive onClose={() => { pendingView.current = null; setLeaveOpen(false); }} onConfirm={discardAndLeave}><p>Your saved database records are safe. Only the changes currently shown on this screen will be discarded.</p></ConfirmDialog>
       </div>

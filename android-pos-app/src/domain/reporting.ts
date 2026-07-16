@@ -79,6 +79,20 @@ export type SalesReport = {
   range: ReportRange;
   generatedAt: string;
   localDataOnly: true;
+  cashDrawer: {
+    sessionCount: number;
+    openingCashCents: number;
+    cashSalesCents: number;
+    cashRefundsCents: number;
+    cashInCents: number;
+    cashOutCents: number;
+    expectedCashCents: number;
+    actualCashCents: number;
+    differenceCents: number;
+    openSessionCount: number;
+    reviewRequiredCount: number;
+    sessions: Array<{ id: string; businessDate: string; cashierName: string; status: string; openingCashCents: number; expectedCashCents: number; actualCashCents: number | null; differenceCents: number | null; openedAt: string; closedAt: string | null }>;
+  };
   summary: {
     grossSalesCents: number;
     discountCents: number;
@@ -273,6 +287,7 @@ export function buildSalesReport(source: SalesReportSource, range: ReportRange, 
     range,
     generatedAt,
     localDataOnly: true,
+    cashDrawer: { sessionCount: 0, openingCashCents: 0, cashSalesCents: 0, cashRefundsCents: 0, cashInCents: 0, cashOutCents: 0, expectedCashCents: 0, actualCashCents: 0, differenceCents: 0, openSessionCount: 0, reviewRequiredCount: 0, sessions: [] },
     summary: {
       grossSalesCents,
       discountCents,

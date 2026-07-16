@@ -87,6 +87,21 @@ export function createSalesReportPdf(report: SalesReport, settings: AppSettings,
   ];
   for (const [label, value] of summaryRows) keyValue(label, value);
 
+  sectionTitle("Cash drawer reconciliation (not revenue)");
+  const cashRows: Array<[string, string]> = [
+    ["Drawer sessions", report.cashDrawer.sessionCount.toLocaleString("en-PH")],
+    ["Opening cash", formatPdfMoney(report.cashDrawer.openingCashCents)],
+    ["Cash sales after change", formatPdfMoney(report.cashDrawer.cashSalesCents)],
+    ["Cash refunds", formatPdfMoney(report.cashDrawer.cashRefundsCents)],
+    ["Cash in", formatPdfMoney(report.cashDrawer.cashInCents)],
+    ["Cash out", formatPdfMoney(report.cashDrawer.cashOutCents)],
+    ["Expected cash", formatPdfMoney(report.cashDrawer.expectedCashCents)],
+    ["Actual cash counted", formatPdfMoney(report.cashDrawer.actualCashCents)],
+    ["Total difference", formatPdfMoney(report.cashDrawer.differenceCents)],
+    ["Sessions awaiting review", report.cashDrawer.reviewRequiredCount.toLocaleString("en-PH")]
+  ];
+  for (const [label, value] of cashRows) keyValue(label, value);
+
   sectionTitle("Payment breakdown");
   if (!report.payments.length) keyValue("No payment records", formatPdfMoney(0));
   for (const payment of report.payments) keyValue(payment.method.replaceAll("_", " "), formatPdfMoney(payment.amountCents));

@@ -64,8 +64,8 @@ export class LocalDatabase {
     const now = nowIso();
     await this.transaction(async () => {
       await this.run("INSERT OR IGNORE INTO roles(id, name, permissions_json, created_at) VALUES (?, ?, ?, ?)", ["role_owner", "OWNER", JSON.stringify(["*"]), now], false);
-      await this.run("INSERT OR IGNORE INTO roles(id, name, permissions_json, created_at) VALUES (?, ?, ?, ?)", ["role_manager", "MANAGER", JSON.stringify(["sales.manage", "sales.refund", "sales.void", "products.manage", "inventory.manage", "orders.manage", "tables.manage", "reports.view", "settings.manage"]), now], false);
-      await this.run("INSERT OR IGNORE INTO roles(id, name, permissions_json, created_at) VALUES (?, ?, ?, ?)", ["role_cashier", "CASHIER", JSON.stringify(["sales.manage", "orders.manage", "products.view", "inventory.view"]), now], false);
+      await this.run("INSERT OR IGNORE INTO roles(id, name, permissions_json, created_at) VALUES (?, ?, ?, ?)", ["role_manager", "MANAGER", JSON.stringify(["sales.manage", "sales.refund", "sales.void", "products.manage", "inventory.manage", "orders.manage", "tables.manage", "reports.view", "settings.manage", "cash_drawer.use", "cash_drawer.manage", "cash_drawer.review", "cash_drawer.report"]), now], false);
+      await this.run("INSERT OR IGNORE INTO roles(id, name, permissions_json, created_at) VALUES (?, ?, ?, ?)", ["role_cashier", "CASHIER", JSON.stringify(["sales.manage", "orders.manage", "products.view", "cash_drawer.use"]), now], false);
       await this.run("INSERT OR IGNORE INTO warehouses(id, code, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", ["warehouse_main", "MAIN", "Main Warehouse", now, now], false);
       await this.run("INSERT OR IGNORE INTO receipt_sequences(purpose, next_value, prefix) VALUES ('SALE', 1, 'POS')", [], false);
       await this.run("INSERT OR IGNORE INTO receipt_sequences(purpose, next_value, prefix) VALUES ('ORDER', 1, 'ORD')", [], false);

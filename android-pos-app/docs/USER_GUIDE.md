@@ -29,17 +29,20 @@ yard, foot, case, and pack. Fractional sales use scaled integer quantities.
 
 ## Retail sale
 
-1. Open **POS** and search by name, SKU, or barcode.
-2. Tap a product, set the quantity, and review its selling unit and price.
-3. Apply supported line discounts, service charge, tip, or tax.
-4. Record cash, GCash, card, or other payment. The payment panel immediately
+1. Open **Cash Drawer**, count the starting float, and choose **Open drawer**.
+2. Open **POS** and search by name, SKU, or barcode.
+3. Tap a product, set the quantity, and review its selling unit and price.
+4. Apply supported line discounts, service charge, tip, or tax.
+5. Record cash, GCash, card, or other payment. The payment panel immediately
    shows the amount still due or the change to return. For example, a PHP 40.00
    sale paid with PHP 100.00 displays PHP 60.00 change.
-5. Complete the sale. Stock, payment, receipt, and audit records commit together.
-6. The saved receipt opens automatically after checkout. Review its items,
+6. Complete the sale. Stock, payment, receipt, cash ledger, and audit records commit together.
+7. The saved receipt opens automatically after checkout. Review its items,
    payment methods, amount received, and change, then choose **Print receipt**.
 
 Repeated checkout taps use the same request key and cannot create a duplicate sale.
+Cash payments and cash refunds require an open drawer. GCash-only transactions do
+not. The cash ledger records only money retained after customer change.
 
 ## Restaurant
 
@@ -85,6 +88,16 @@ created.
 
 ## Daily close
 
-Export the day's sales CSV, review low stock, create a full backup, and move that
-backup to another trusted device or drive. Do not keep the only backup on the POS
-tablet.
+Open **Cash Drawer**, record any documented cash in or cash out, and choose
+**Close drawer**. Count denominations or enter the actual cash total. The app
+compares actual cash with opening cash plus cash sales, minus cash refunds, plus
+cash in, minus cash out. A non-zero difference is permanently marked for manager
+review. Then export the day's sales report, review low stock, create a full
+backup, and move that backup to another trusted device or drive. Do not keep the
+only backup on the POS tablet.
+
+Cashiers see and close only their own drawer sessions. The Inventory screen,
+product edit/deactivate controls, stock adjustment form, Alerts, Settings, and
+Reports are not shown in Cashier mode. Product search remains available in POS
+and Restaurant so cashiers can sell active stock. Inventory and catalog write
+services independently enforce management permission.

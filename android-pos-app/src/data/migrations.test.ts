@@ -5,8 +5,8 @@ describe("offline database migrations", () => {
   const sql = migrations.map((migration) => migration.sql).join("\n").toLowerCase();
 
   it("uses ordered, non-destructive migration versions", () => {
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3]);
-    expect(currentSchemaVersion).toBe(3);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
+    expect(currentSchemaVersion).toBe(4);
     expect(sql).not.toMatch(/\bdrop\s+(table|column|index)\b/);
   });
 
@@ -14,9 +14,25 @@ describe("offline database migrations", () => {
     const required = [
       "users", "products", "inventory_stock", "inventory_movements", "restaurant_tables", "orders",
       "order_items", "inventory_reservations", "sales", "sale_items", "sale_payments", "refunds",
-      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts"
+      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts", "cash_sessions", "cash_movements"
     ];
     for (const table of required) expect(sql).toContain(`create table if not exists ${table}`);
+  });
+
+  it("enforces one open drawer and idempotent cash writes", () => {
+    expect(sql).toContain("cash_sessions_one_open_register_idx");
+    expect(sql).toContain("where status='open'");
+    expect(sql).toMatch(/create table if not exists cash_sessions \([\s\S]*?request_key text not null unique/);
+    expect(sql).toMatch(/create table if not exists cash_movements \([\s\S]*?request_key text not null unique/);
+    expect(sql).toContain("cash_movements_sale_once_idx");
+    expect(sql).toContain("cash_movements_refund_once_idx");
+  });
+
+  it("removes inventory access from the migrated cashier role", () => {
+    const cashierUpdate = sql.match(/update roles set permissions_json='([^']+)' where id='role_cashier'/)?.[1] ?? "";
+    expect(cashierUpdate).toContain("cash_drawer.use");
+    expect(cashierUpdate).not.toContain("inventory.view");
+    expect(cashierUpdate).not.toContain("inventory.manage");
   });
 
   it("enforces idempotent sale, order, refund, and import requests", () => {

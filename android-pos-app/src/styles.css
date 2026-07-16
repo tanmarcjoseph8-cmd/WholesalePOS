@@ -22,6 +22,73 @@ input, select, textarea {
   background: var(--surface);
   color: var(--text);
 }
+
+/* Offline cash drawer */
+.cash-tabs { width: fit-content; }
+.cash-tabs button { display: flex; align-items: center; gap: var(--space-2); }
+.drawer-open-panel { display: grid; grid-template-columns: 60px minmax(180px, 1fr) minmax(180px, 260px) minmax(200px, 1fr) auto; align-items: end; gap: var(--space-4); padding: var(--space-5); }
+.drawer-open-panel h3, .drawer-open-panel p { margin: 0; }
+.drawer-open-panel p { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.drawer-empty-icon { display: grid; width: 52px; height: 52px; place-items: center; border-radius: var(--radius-md); background: var(--color-primary-soft); color: var(--color-primary); }
+.drawer-status-band { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-5); border: 1px solid var(--color-border); border-left: 4px solid var(--color-success); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-xs); }
+.drawer-status-band > div { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-1) var(--space-3); }
+.drawer-status-band small { grid-column: 2; color: var(--color-text-muted); }
+.drawer-metrics, .drawer-report-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.drawer-actions { display: flex; gap: var(--space-2); }
+.drawer-movements { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.drawer-movements > header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.drawer-movements > header h3 { margin: 0; }
+.drawer-movements > header span, .drawer-movements td small { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.drawer-movements td small { display: block; }
+.drawer-filters { display: grid; grid-template-columns: repeat(3, minmax(160px, 240px)); gap: var(--space-4); padding: var(--space-4); }
+.drawer-history-layout { grid-template-columns: 280px minmax(0, 1fr); }
+.drawer-history-layout .sale-list button { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-2); text-align: left; }
+.drawer-history-layout .sale-list button span, .drawer-history-layout .sale-list button small { color: var(--color-text-muted); }
+.drawer-status { align-self: center; justify-self: end; font-size: var(--font-size-xs); text-transform: capitalize; }
+.drawer-status.review_required { color: var(--color-danger); }
+.drawer-status.closed, .drawer-status.reviewed { color: var(--color-success); }
+.drawer-session-detail { min-width: 0; }
+.cash-count-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.cash-count-summary > span { display: grid; gap: var(--space-1); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-subtle); color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.cash-count-summary strong { color: var(--color-text); font-size: var(--font-size-md); }
+.cash-count-summary .balanced { border-color: var(--color-success); background: var(--color-success-soft); }
+.cash-count-summary .difference { border-color: var(--color-danger); background: var(--color-danger-soft); }
+.denomination-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); max-height: 42vh; overflow: auto; }
+.denomination-grid label { display: grid; grid-template-columns: minmax(0, 1fr) 88px; align-items: center; gap: var(--space-2); }
+.denomination-grid input { margin: 0; }
+.review-panel { display: grid; gap: var(--space-3); padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+.cash-drawer-notice { display: flex; align-items: center; justify-content: space-between; }
+.cash-drawer-notice .button { flex: 0 0 auto; }
+.cash-report-panel > header > div { display: grid; gap: var(--space-1); }
+.cash-report-panel > header b { color: var(--color-danger); }
+.drawer-report-metrics { padding: var(--space-4); }
+.drawer-report-metrics article { min-height: 96px; }
+.drawer-dashboard-band { display: grid; min-height: 76px; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); text-align: left; box-shadow: var(--shadow-xs); }
+.drawer-dashboard-band > svg:first-child { color: var(--color-primary); }
+.drawer-dashboard-band > svg:last-child { justify-self: end; color: var(--color-text-muted); }
+.drawer-dashboard-band div { display: grid; gap: var(--space-1); }
+.drawer-dashboard-band span { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+
+@media (max-width: 1100px) {
+  .drawer-open-panel { grid-template-columns: 52px minmax(0, 1fr) minmax(180px, 240px); }
+  .drawer-open-panel label:nth-of-type(2) { grid-column: 2 / -1; }
+  .drawer-open-panel > button { grid-column: 3; }
+}
+
+@media (max-width: 820px), (orientation: portrait) and (max-width: 1100px) {
+  .drawer-open-panel { grid-template-columns: 52px minmax(0, 1fr); align-items: center; }
+  .drawer-open-panel label, .drawer-open-panel label:nth-of-type(2), .drawer-open-panel > button { grid-column: 1 / -1; }
+  .drawer-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .drawer-history-layout { grid-template-columns: 1fr; }
+  .drawer-history-layout .sale-list { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); overflow-x: auto; }
+  .cash-count-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .drawer-status-band { align-items: stretch; flex-direction: column; }
+  .drawer-actions .button { flex: 1; }
+  .drawer-filters, .drawer-metrics, .drawer-report-metrics, .denomination-grid { grid-template-columns: 1fr; }
+}
 textarea { min-height: 88px; resize: vertical; }
 label { display: block; color: var(--text); font-size: .88rem; font-weight: 650; }
 

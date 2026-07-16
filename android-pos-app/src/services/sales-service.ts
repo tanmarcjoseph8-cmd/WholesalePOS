@@ -1,7 +1,9 @@
 import type { LocalDatabase } from "../data/database";
+import { netCashReceived } from "../domain/cash-drawer";
 import { assertSufficientPayment, lineTotals, saleTotals, toBaseQuantity } from "../domain/calculations";
 import { createId, nowIso, type CartLine, type SaleCommand, type SaleSummary, type UnitCode } from "../domain/models";
 import { audit, nextNumber } from "./service-helpers";
+import { recordAutomaticCashMovement } from "./cash-drawer-service";
 
 type ProductSaleRow = {
   id: string;
@@ -196,6 +198,22 @@ export class SalesService {
       for (const payment of command.payments.filter((entry) => entry.amountCents > 0)) {
         await this.db.run("INSERT INTO sale_payments(id, sale_id, method, amount_cents, reference, created_at) VALUES (?, ?, ?, ?, ?, ?)", [createId("payment"), saleId, payment.method, payment.amountCents, payment.reference ?? null, now], false);
       }
+      const cashReceivedCents = netCashReceived(
+        command.payments.filter((payment) => payment.method === "CASH").reduce((sum, payment) => sum + payment.amountCents, 0),
+        changeTotalCents
+      );
+      if (cashReceivedCents > 0) {
+        const cashSessionId = await recordAutomaticCashMovement(this.db, {
+          requestKey: `sale:${saleId}`,
+          actorId: command.cashierId,
+          type: "SALE",
+          amountCents: cashReceivedCents,
+          relatedId: saleId,
+          reference: receiptNumber,
+          createdAt: now
+        });
+        await this.db.run("UPDATE sales SET cash_session_id=? WHERE id=?", [cashSessionId, saleId], false);
+      }
       if (command.orderId) {
         const changed = await this.db.run(
           "UPDATE orders SET status='COMPLETED', completed_at=?, updated_at=?, version=version+1 WHERE id=? AND version=? AND status NOT IN ('COMPLETED','CANCELLED')",
@@ -298,17 +316,32 @@ export class SalesService {
         false
       );
       const originalPayments = await this.db.query<{ method: string; amount_cents: number }>(
-        "SELECT method, SUM(amount_cents) AS amount_cents FROM sale_payments WHERE sale_id=? GROUP BY method ORDER BY method",
+        `SELECT sp.method, SUM(sp.amount_cents) - CASE WHEN sp.method='CASH' THEN s.change_total_cents ELSE 0 END AS amount_cents
+         FROM sale_payments sp JOIN sales s ON s.id=sp.sale_id WHERE sp.sale_id=? GROUP BY sp.method, s.change_total_cents ORDER BY sp.method`,
         [input.saleId]
       );
       let paymentRemaining = grandTotalCents;
+      let cashRefundCents = 0;
       for (const payment of originalPayments) {
         const amount = Math.min(paymentRemaining, Number(payment.amount_cents));
         if (amount <= 0) continue;
         await this.db.run("INSERT INTO refund_payments(id, refund_id, method, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)", [createId("refundpayment"), refundId, payment.method, amount, now], false);
+        if (payment.method === "CASH") cashRefundCents += amount;
         paymentRemaining -= amount;
       }
       if (paymentRemaining > 0) await this.db.run("INSERT INTO refund_payments(id, refund_id, method, amount_cents, created_at) VALUES (?, ?, 'OTHER', ?, ?)", [createId("refundpayment"), refundId, paymentRemaining, now], false);
+      if (cashRefundCents > 0) {
+        const cashSessionId = await recordAutomaticCashMovement(this.db, {
+          requestKey: `refund:${refundId}`,
+          actorId: input.cashierId,
+          type: "REFUND",
+          amountCents: cashRefundCents,
+          relatedId: refundId,
+          reference: receiptNumber,
+          createdAt: now
+        });
+        await this.db.run("UPDATE refunds SET cash_session_id=? WHERE id=?", [cashSessionId, refundId], false);
+      }
       for (const entry of prepared) {
         const movementId = createId("movement");
         await this.db.run("UPDATE inventory_stock SET quantity_micro=quantity_micro+?, updated_at=? WHERE product_id=? AND warehouse_id=?", [entry.baseQuantityMicro, now, entry.item.product_id, entry.item.warehouse_id], false);

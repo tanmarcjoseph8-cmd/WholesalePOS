@@ -118,6 +118,33 @@ export class MobileReportService {
     const refundPayments: ReportRefundPaymentRow[] = refundPaymentRows.map((row) => ({ refundId: row.refund_id, saleId: row.sale_id, saleStatus: row.sale_status, kind: row.kind, method: row.method, amountCents: Number(row.amount_cents) }));
 
     const source: SalesReportSource = { sales, items, payments, refunds, refundPayments };
-    return buildSalesReport(source, range);
+    const report = buildSalesReport(source, range);
+    const cashRows = await this.db.query<{
+      id: string; business_date: string; cashier_name: string; status: string; opening_cash_cents: number;
+      expected_cash_cents: number | null; actual_cash_cents: number | null; difference_cents: number | null; opened_at: string; closed_at: string | null;
+      cash_sales_cents: number; cash_refunds_cents: number; cash_in_cents: number; cash_out_cents: number;
+    }>(`SELECT cs.id, cs.business_date, u.name AS cashier_name, cs.status, cs.opening_cash_cents, cs.expected_cash_cents,
+       cs.actual_cash_cents, cs.difference_cents, cs.opened_at, cs.closed_at,
+       COALESCE(SUM(CASE WHEN cm.type='SALE' THEN cm.amount_cents ELSE 0 END),0) AS cash_sales_cents,
+       COALESCE(SUM(CASE WHEN cm.type='REFUND' THEN cm.amount_cents ELSE 0 END),0) AS cash_refunds_cents,
+       COALESCE(SUM(CASE WHEN cm.type IN ('CASH_IN','CORRECTION_IN') THEN cm.amount_cents ELSE 0 END),0) AS cash_in_cents,
+       COALESCE(SUM(CASE WHEN cm.type IN ('CASH_OUT','CORRECTION_OUT') THEN cm.amount_cents ELSE 0 END),0) AS cash_out_cents
+       FROM cash_sessions cs JOIN users u ON u.id=cs.opened_by_user_id LEFT JOIN cash_movements cm ON cm.cash_session_id=cs.id
+       WHERE cs.business_date>=? AND cs.business_date<=? GROUP BY cs.id, u.name ORDER BY cs.opened_at DESC`, [range.fromDate, range.toDate]);
+    report.cashDrawer.sessions = cashRows.map((row) => ({ id: row.id, businessDate: row.business_date, cashierName: row.cashier_name, status: row.status,
+      openingCashCents: Number(row.opening_cash_cents), expectedCashCents: row.expected_cash_cents === null ? Number(row.opening_cash_cents) + Number(row.cash_sales_cents) - Number(row.cash_refunds_cents) + Number(row.cash_in_cents) - Number(row.cash_out_cents) : Number(row.expected_cash_cents),
+      actualCashCents: row.actual_cash_cents === null ? null : Number(row.actual_cash_cents), differenceCents: row.difference_cents === null ? null : Number(row.difference_cents), openedAt: row.opened_at, closedAt: row.closed_at }));
+    report.cashDrawer.sessionCount = cashRows.length;
+    report.cashDrawer.openingCashCents = cashRows.reduce((sum, row) => sum + Number(row.opening_cash_cents), 0);
+    report.cashDrawer.cashSalesCents = cashRows.reduce((sum, row) => sum + Number(row.cash_sales_cents), 0);
+    report.cashDrawer.cashRefundsCents = cashRows.reduce((sum, row) => sum + Number(row.cash_refunds_cents), 0);
+    report.cashDrawer.cashInCents = cashRows.reduce((sum, row) => sum + Number(row.cash_in_cents), 0);
+    report.cashDrawer.cashOutCents = cashRows.reduce((sum, row) => sum + Number(row.cash_out_cents), 0);
+    report.cashDrawer.expectedCashCents = report.cashDrawer.sessions.reduce((sum, row) => sum + row.expectedCashCents, 0);
+    report.cashDrawer.actualCashCents = report.cashDrawer.sessions.reduce((sum, row) => sum + (row.actualCashCents ?? 0), 0);
+    report.cashDrawer.differenceCents = report.cashDrawer.sessions.reduce((sum, row) => sum + (row.differenceCents ?? 0), 0);
+    report.cashDrawer.openSessionCount = cashRows.filter((row) => row.status === "OPEN").length;
+    report.cashDrawer.reviewRequiredCount = cashRows.filter((row) => row.status === "REVIEW_REQUIRED").length;
+    return report;
   }
 }

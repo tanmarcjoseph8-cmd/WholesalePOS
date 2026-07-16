@@ -18,3 +18,10 @@ Version 0.2.0 adds migration 3 with `inventory_alert_state` and
 `inventory_alerts`. It does not rewrite products, stock, sales, payments, users,
 or settings. The first launch derives alert state from the authoritative
 available-inventory view in one transaction. Existing data remains unchanged.
+
+Version 0.4.0 adds migration 4 with `cash_sessions`, `cash_movements`, and links
+from finalized cash sales and refunds to the drawer session. Existing sales,
+payments, refunds, products, and stock records are not recalculated or rewritten.
+The migration also removes Inventory access from the built-in Cashier role and
+adds the limited `cash_drawer.use` permission. Owner permissions remain `*`;
+Manager receives drawer use, management, review, and report permissions.

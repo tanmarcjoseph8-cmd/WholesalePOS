@@ -15,9 +15,9 @@ See `docs/AUDIT.md` for the Windows compatibility audit and `docs/ARCHITECTURE.m
 
 ## Installable builds
 
-- `apk/WholesalePOS-Offline-0.3.2-release.apk`: signed APK for direct tablet installation
-- `apk/WholesalePOS-Offline-0.3.2-debug.apk`: development APK
-- `apk/WholesalePOS-Offline-0.3.2-release.aab`: signed Android App Bundle
+- `apk/WholesalePOS-Offline-0.4.0-release.apk`: signed APK for direct tablet installation
+- `apk/WholesalePOS-Offline-0.4.0-debug.apk`: development APK
+- `apk/WholesalePOS-Offline-0.4.0-release.aab`: signed Android App Bundle
 - `apk/checksums.json`: SHA-256 checksums for all artifacts
 
 Start with [Build and installation](docs/BUILD_AND_INSTALL.md), then read [Backup and restore](docs/BACKUP_RESTORE.md) before entering live business data.
@@ -36,6 +36,7 @@ Native APK builds require JDK 21 and Android SDK 36. Detailed setup and signing 
 
 - [User guide](docs/USER_GUIDE.md)
 - [Sales reports and inventory alerts](docs/SALES_REPORTS_AND_ALERTS.md)
+- [Cash drawer operations](docs/CASH_DRAWER.md)
 - [Product import format](docs/IMPORT_TEMPLATE.md)
 - [Fire OS 7 installation](docs/FIRE_OS_7.md)
 - [Printer setup](docs/PRINTER_SETUP.md)

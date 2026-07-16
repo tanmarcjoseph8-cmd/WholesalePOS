@@ -1,6 +1,7 @@
 import { database } from "../data/database";
 import { AuthService } from "./auth-service";
 import { BackupService } from "./backup-service";
+import { CashDrawerService } from "./cash-drawer-service";
 import { CatalogService } from "./catalog-service";
 import { ImportExportService } from "./import-export-service";
 import { InventoryService } from "./inventory-service";
@@ -32,6 +33,7 @@ export class OfflinePosApplication {
   readonly auth = new AuthService(database);
   readonly catalog = new CatalogService(database);
   readonly inventory = new InventoryService(database);
+  readonly cashDrawer = new CashDrawerService(database);
   readonly sales = new SalesService(database);
   readonly restaurant = new RestaurantService(database);
   readonly settingsReports = new SettingsReportService(database);

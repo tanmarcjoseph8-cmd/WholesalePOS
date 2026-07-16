@@ -11,6 +11,7 @@ export type AppContextValue = {
   notify: (message: string, tone?: "success" | "error") => void;
   inventoryFocusId: string | null;
   openInventoryProduct: (productId: string) => void;
+  openCashDrawer: () => void;
   clearInventoryFocus: () => void;
 };
 

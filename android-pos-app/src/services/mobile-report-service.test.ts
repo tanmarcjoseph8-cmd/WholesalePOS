@@ -43,8 +43,10 @@ describe("MobileReportService", () => {
     const paymentQuery = queries.find((sql) => sql.includes("FROM sale_payments"));
 
     expect(report.summary.netSalesCents).toBe(0);
-    expect(queries.every((sql) => sql.includes("s.status IN"))).toBe(true);
+    expect(queries.filter((sql) => /\b(sales|sale_items|sale_payments|refunds|refund_payments)\b/.test(sql)).every((sql) => sql.includes("s.status IN"))).toBe(true);
     expect(paymentQuery).toContain("s.change_total_cents");
     expect(paymentQuery).toContain("sp.method='CASH'");
+    expect(queries.some((sql) => sql.includes("FROM cash_sessions"))).toBe(true);
+    expect(report.cashDrawer.sessionCount).toBe(0);
   });
 });
