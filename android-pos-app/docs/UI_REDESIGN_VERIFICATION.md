@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | ESLint | Pass | Pass |
 | TypeScript project build | Pass | Pass |
-| Vitest | 10 files, 29 tests passed | 11 files, 30 tests passed |
+| Vitest | 10 files, 29 tests passed | 11 files, 31 tests passed |
 | Vite production build | Pass | Pass |
 | Android debug APK | Pass | Pass |
 
@@ -44,6 +44,7 @@ Redesigned:
 - `docs/ui-redesign/after/tablet-sales.png`
 - `docs/ui-redesign/after/tablet-reports.png`
 - `docs/ui-redesign/after/portrait-shell-0.3.1.png`
+- `docs/ui-redesign/after/payment-receipt-0.3.2.png`
 
 ## Portrait tablet check
 

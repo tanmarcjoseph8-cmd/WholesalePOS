@@ -32,10 +32,12 @@ yard, foot, case, and pack. Fractional sales use scaled integer quantities.
 1. Open **POS** and search by name, SKU, or barcode.
 2. Tap a product, set the quantity, and review its selling unit and price.
 3. Apply supported line discounts, service charge, tip, or tax.
-4. Record cash, GCash, card, or other payment. Card entries record only amount
-   and reference; the app never stores card numbers.
+4. Record cash, GCash, card, or other payment. The payment panel immediately
+   shows the amount still due or the change to return. For example, a PHP 40.00
+   sale paid with PHP 100.00 displays PHP 60.00 change.
 5. Complete the sale. Stock, payment, receipt, and audit records commit together.
-6. Preview, save, share, or print the generated receipt.
+6. The saved receipt opens automatically after checkout. Review its items,
+   payment methods, amount received, and change, then choose **Print receipt**.
 
 Repeated checkout taps use the same request key and cannot create a duplicate sale.
 
@@ -45,7 +47,8 @@ Use **Restaurant** for dine-in, walk-in, counter, takeout, pickup, delivery, and
 custom order types. Add or rename tables, open an order, add products, and move,
 merge, split, or cancel orders with confirmation. Tables with active orders
 cannot be deactivated. Confirmed order quantities are reserved; physical stock
-is deducted once, when payment completes.
+is deducted once, when payment completes. Restaurant payments use the same live
+amount-due and change calculation, and automatically open the completed receipt.
 
 ## Corrections and reports
 

@@ -19,7 +19,7 @@ export class AndroidPdfReceiptPrinter implements ReceiptPrinter {
   async printOrShare(sale: SaleDetail, settings: AppSettings) {
     const { jsPDF } = await import("jspdf");
     const width = settings.paperWidth === "58mm" ? 58 : 80;
-    const estimatedHeight = Math.max(140, 105 + sale.lines.length * 12 + sale.payments.length * 7);
+    const estimatedHeight = Math.max(150, 120 + sale.lines.length * 12 + sale.payments.length * 5);
     const doc = new jsPDF({ unit: "mm", format: [width, estimatedHeight], orientation: "portrait" });
     const margin = 4;
     let y = 7;
@@ -58,6 +58,20 @@ export class AndroidPdfReceiptPrinter implements ReceiptPrinter {
     doc.setFontSize(11);
     doc.text("TOTAL", margin, y);
     doc.text(formatMoney(sale.grandTotalCents), width - margin, y, { align: "right" });
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    for (const payment of sale.payments) {
+      doc.text(payment.method.replaceAll("_", " "), margin, y);
+      doc.text(formatMoney(payment.amountCents), width - margin, y, { align: "right" });
+      y += 4;
+    }
+    doc.text("AMOUNT RECEIVED", margin, y);
+    doc.text(formatMoney(sale.paidTotalCents), width - margin, y, { align: "right" });
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.text("CHANGE", margin, y);
+    doc.text(formatMoney(sale.changeTotalCents), width - margin, y, { align: "right" });
     y += 7;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);

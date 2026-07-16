@@ -32,3 +32,19 @@ export function assertSufficientPayment(paidCents: number, totalCents: number) {
   return paidCents - totalCents;
 }
 
+export function paymentBalance(totalCents: number, paidCents: number) {
+  if (!Number.isSafeInteger(totalCents) || totalCents < 0) throw new Error("Sale total must be a valid amount.");
+  if (!Number.isSafeInteger(paidCents) || paidCents < 0) throw new Error("Payment must be a valid amount.");
+  const differenceCents = paidCents - totalCents;
+  return {
+    changeCents: Math.max(0, differenceCents),
+    dueCents: Math.max(0, -differenceCents),
+    paidCents
+  };
+}
+
+export function moneyInputToCents(value: string) {
+  const amount = Number(value);
+  const cents = Math.round(amount * 100);
+  return Number.isFinite(amount) && amount >= 0 && Number.isSafeInteger(cents) ? cents : 0;
+}

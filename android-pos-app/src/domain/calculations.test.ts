@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSufficientPayment, lineTotals, saleTotals, toBaseQuantity } from "./calculations";
+import { assertSufficientPayment, lineTotals, moneyInputToCents, paymentBalance, saleTotals, toBaseQuantity } from "./calculations";
 import { toMicro, type CartLine } from "./models";
 
 const line: CartLine = {
@@ -28,5 +28,12 @@ describe("offline sale calculations", () => {
     expect(() => assertSufficientPayment(100, 101)).toThrow("Payment total is less");
     expect(assertSufficientPayment(20_000, 17_440)).toBe(2_560);
   });
-});
 
+  it("shows the remaining balance or cash change before checkout", () => {
+    expect(paymentBalance(4_000, 10_000)).toEqual({ changeCents: 6_000, dueCents: 0, paidCents: 10_000 });
+    expect(paymentBalance(4_000, 1_500)).toEqual({ changeCents: 0, dueCents: 2_500, paidCents: 1_500 });
+    expect(moneyInputToCents("100")).toBe(10_000);
+    expect(moneyInputToCents("invalid")).toBe(0);
+    expect(moneyInputToCents("1e20")).toBe(0);
+  });
+});

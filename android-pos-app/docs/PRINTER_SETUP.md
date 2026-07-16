@@ -1,8 +1,10 @@
 # Printer Setup
 
 WholesalePOS generates PDF receipts at 58 mm or 80 mm width. Set the width under
-**Settings**, open a completed sale, and choose receipt print/share. Completing a
-sale never depends on a printer.
+**Settings**. After each completed retail or restaurant transaction, the receipt
+opens automatically; choose **Print receipt** to open Android print/share. Printed
+receipts include payment amounts, amount received, and change. Completing a sale
+never depends on a printer.
 
 ## Android print path
 
