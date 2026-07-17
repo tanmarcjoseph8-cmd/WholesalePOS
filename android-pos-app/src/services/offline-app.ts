@@ -13,6 +13,7 @@ import { AndroidPdfReceiptPrinter } from "./receipt-service";
 import { RestaurantService } from "./restaurant-service";
 import { SalesService } from "./sales-service";
 import { SettingsReportService } from "./settings-report-service";
+import { FactoryResetService } from "./factory-reset-service";
 
 async function startupStep(label: string, operation: () => Promise<unknown>, timeoutMs = 20_000) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -42,6 +43,7 @@ export class OfflinePosApplication {
   readonly mobileReports = new MobileReportService(database, this.settingsReports);
   readonly reportPdf = new ReportPdfService();
   readonly backup = new BackupService(database);
+  readonly factoryReset = new FactoryResetService(database, this.auth, this.backup, this.inventoryNotifications);
   readonly importExport = new ImportExportService(database, this.settingsReports);
   readonly receiptPrinter = new AndroidPdfReceiptPrinter();
 

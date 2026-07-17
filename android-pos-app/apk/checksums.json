@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-07-16T07:31:18.235Z",
+  "generatedAt": "2026-07-17T11:46:09.879Z",
   "artifacts": [
     {
-      "file": "WholesalePOS-Offline-0.4.1-debug.apk",
-      "bytes": 33318375,
-      "sha256": "980b95659c63c056bb98ac6a5564dfebcf30e94aacd6ab2dd26bbc00ce34ed1c"
+      "file": "WholesalePOS-Offline-0.5.0-debug.apk",
+      "bytes": 33325921,
+      "sha256": "666645113eabab136e861e8eb0304231c75319ad9e51fabaf6607fe76f41aaa9"
     },
     {
-      "file": "WholesalePOS-Offline-0.4.1-release.apk",
-      "bytes": 22882288,
-      "sha256": "25f6b22d389153179fe9e7d1bee2d34c9752a18ef4e78bd920117363d7f5dee9"
+      "file": "WholesalePOS-Offline-0.5.0-release.apk",
+      "bytes": 22888570,
+      "sha256": "ab2a252968ed3567ddb59a0356d78abcc3d1b84b3df2ce12a9920c39e2dcd673"
     },
     {
-      "file": "WholesalePOS-Offline-0.4.1-release.aab",
-      "bytes": 11843132,
-      "sha256": "3eea85b7cb3aceb886ad1f7fc27535c4328a774a3c1eb68662c917072d9b3b93"
+      "file": "WholesalePOS-Offline-0.5.0-release.aab",
+      "bytes": 11849656,
+      "sha256": "4b00e3f42d78e5289b3c6d83c613adb7f67250b6d7aededafab397b4951a4fed"
     }
   ]
 }

@@ -31,3 +31,9 @@ Version 0.4.1 adds migration 5. It grants the built-in Cashier role the limited
 that are low or out of stock. It does not grant `inventory.view` or
 `inventory.manage`, so cashiers still cannot open Inventory, edit products,
 import products, or change stock. No operational records are rewritten.
+
+Version 0.5.0 adds migration 6 with the `device_state` table and seeds a local
+Installation ID. Existing users, products, stock, orders, sales, payments,
+settings, and audit records remain unchanged during the update. A successful
+Owner Factory Reset regenerates this ID while preserving migration history,
+schema version 6, built-in roles, and the default warehouse.

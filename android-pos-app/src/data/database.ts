@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { CapacitorSQLite, SQLiteConnection, type SQLiteDBConnection, type capSQLiteJson } from "@capacitor-community/sqlite";
 import { currentSchemaVersion, migrations } from "./migrations";
-import { nowIso } from "../domain/models";
+import { createId, nowIso } from "../domain/models";
 
 export type SqlValue = string | number | null;
 export type InventoryChangeListener = () => Promise<unknown> | unknown;
@@ -19,6 +19,7 @@ export class LocalDatabase {
   private inventoryListeners = new Set<InventoryChangeListener>();
   private transactionDepth = 0;
   private inventoryChangePending = false;
+  private migrationInProgress = false;
 
   async initialize() {
     if (!Capacitor.isNativePlatform()) {
@@ -44,19 +45,24 @@ export class LocalDatabase {
 
   private async applyMigrations() {
     const connection = this.requireConnection();
-    await connection.execute(`CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      applied_at TEXT NOT NULL
-    );`, true);
-    const rows = await this.query<{ version: number }>("SELECT version FROM schema_migrations ORDER BY version");
-    const applied = new Set(rows.map((row) => Number(row.version)));
-    for (const migration of migrations) {
-      if (applied.has(migration.version)) continue;
-      await this.transaction(async () => {
-        await this.execute(migration.sql, false);
-        await this.run("INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)", [migration.version, migration.name, nowIso()], false);
-      });
+    this.migrationInProgress = true;
+    try {
+      await connection.execute(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );`, true);
+      const rows = await this.query<{ version: number }>("SELECT version FROM schema_migrations ORDER BY version");
+      const applied = new Set(rows.map((row) => Number(row.version)));
+      for (const migration of migrations) {
+        if (applied.has(migration.version)) continue;
+        await this.transaction(async () => {
+          await this.execute(migration.sql, false);
+          await this.run("INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)", [migration.version, migration.name, nowIso()], false);
+        });
+      }
+    } finally {
+      this.migrationInProgress = false;
     }
   }
 
@@ -70,6 +76,7 @@ export class LocalDatabase {
       await this.run("INSERT OR IGNORE INTO receipt_sequences(purpose, next_value, prefix) VALUES ('SALE', 1, 'POS')", [], false);
       await this.run("INSERT OR IGNORE INTO receipt_sequences(purpose, next_value, prefix) VALUES ('ORDER', 1, 'ORD')", [], false);
       await this.run("INSERT OR IGNORE INTO receipt_sequences(purpose, next_value, prefix) VALUES ('REFUND', 1, 'REF')", [], false);
+      await this.run("INSERT OR IGNORE INTO device_state(key, value, updated_at) VALUES ('installation_id', ?, ?)", [createId("installation"), now], false);
     });
   }
 
@@ -140,6 +147,10 @@ export class LocalDatabase {
   async schemaVersion() {
     const rows = await this.query<{ version: number }>("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations");
     return Number(rows[0]?.version ?? 0);
+  }
+
+  isMigrationInProgress() {
+    return this.migrationInProgress;
   }
 
   async exportFull() {

@@ -107,3 +107,17 @@ edit/deactivate controls, stock adjustment form, Settings, and Reports are not
 shown in Cashier mode. Product search remains available in POS and Restaurant so
 cashiers can sell active stock. Inventory and catalog write services
 independently enforce management permission.
+
+## Owner factory reset
+
+Owners can open **Settings > Advanced > Factory Reset** to erase all local
+business data and return the app to first-owner setup. Managers and cashiers do
+not see or have access to this control. The flow requires the current Owner PIN
+or password, the exact phrase `FACTORY RESET`, and a final record-count review.
+
+A full JSON backup is enabled by default and is written to **WholesalePOS
+Backups** in the app's Android files area before deletion. If the backup cannot
+be created and verified, nothing is erased. Turning backup off requires an
+additional permanent-loss acknowledgement. After success, receipt sequences are
+reset and a new local Installation ID is generated. See
+[Owner Factory Reset](FACTORY_RESET.md) before using this feature.

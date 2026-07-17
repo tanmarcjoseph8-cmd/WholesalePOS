@@ -5,8 +5,8 @@ describe("offline database migrations", () => {
   const sql = migrations.map((migration) => migration.sql).join("\n").toLowerCase();
 
   it("uses ordered, non-destructive migration versions", () => {
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5]);
-    expect(currentSchemaVersion).toBe(5);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(currentSchemaVersion).toBe(6);
     expect(sql).not.toMatch(/\bdrop\s+(table|column|index)\b/);
   });
 
@@ -14,7 +14,7 @@ describe("offline database migrations", () => {
     const required = [
       "users", "products", "inventory_stock", "inventory_movements", "restaurant_tables", "orders",
       "order_items", "inventory_reservations", "sales", "sale_items", "sale_payments", "refunds",
-      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts", "cash_sessions", "cash_movements"
+      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts", "cash_sessions", "cash_movements", "device_state"
     ];
     for (const table of required) expect(sql).toContain(`create table if not exists ${table}`);
   });

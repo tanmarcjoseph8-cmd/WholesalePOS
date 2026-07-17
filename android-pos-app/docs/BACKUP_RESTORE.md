@@ -13,6 +13,19 @@ protected but not encrypted as a file, so store it securely.
 Use at least two off-tablet copies and test restore periodically on a spare
 installation. Back up before app updates, bulk imports, and major stock work.
 
+## Factory reset backup
+
+Owner Factory Reset creates a full backup by default before deletion. It writes
+and verifies `before-factory-reset-<timestamp>.json` in the app-specific external
+**WholesalePOS Backups** folder. The backup contains the reset-request audit
+entry, reset metadata, full SQLite export, and SHA-256 payload hash. A write,
+verification, or zero-byte failure stops the reset before business data is
+deleted.
+
+The folder survives the in-app Factory Reset, but Android may remove it when the
+app is uninstalled, app storage is cleared, or the tablet is reset. Move the file
+off the tablet for durable recovery. See [Owner Factory Reset](FACTORY_RESET.md).
+
 ## Restore
 
 1. Open **Settings** and choose **Restore backup**.

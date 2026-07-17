@@ -5,12 +5,22 @@ import { nowIso, type LocalUser } from "../domain/models";
 import { fileService, type FileService } from "../platform/file-service";
 import { audit } from "./service-helpers";
 
+export type ResetBackupMetadata = {
+  ownerUserId: string;
+  registerId: string;
+  appVersion: string;
+  backupFileName: string;
+  resetType: "FACTORY_RESET";
+  resetResult: "PENDING";
+};
+
 type BackupEnvelope = {
   format: "wholesalepos-offline-backup";
   schemaVersion: number;
   createdAt: string;
   payloadHash: string;
   payload: capSQLiteJson;
+  resetMetadata?: ResetBackupMetadata;
 };
 
 async function sha256(value: string) {
@@ -30,6 +40,33 @@ export class BackupService {
     const uri = await this.files.saveAndShare({ fileName: `wholesalepos-backup-${stamp}.json`, data: JSON.stringify(envelope), mimeType: "application/json", dialogTitle: "Save POS backup" });
     await audit(this.db, { actorId: actor.id, action: "BACKUP_EXPORTED", entityType: "Backup", metadata: { createdAt, uri } });
     return uri;
+  }
+
+  async createFactoryResetBackup(actor: LocalUser, appVersion: string) {
+    const createdAt = nowIso();
+    const stamp = createdAt.replace(/[:.]/g, "-");
+    const fileName = `before-factory-reset-${stamp}.json`;
+    const resetMetadata: ResetBackupMetadata = {
+      ownerUserId: actor.id,
+      registerId: "device_main",
+      appVersion,
+      backupFileName: fileName,
+      resetType: "FACTORY_RESET",
+      resetResult: "PENDING"
+    };
+    await audit(this.db, { actorId: actor.id, action: "FACTORY_RESET_REQUESTED", entityType: "Application", metadata: resetMetadata });
+    const payload = await this.db.exportFull();
+    const payloadText = JSON.stringify(payload);
+    const envelope: BackupEnvelope = {
+      format: "wholesalepos-offline-backup",
+      schemaVersion: currentSchemaVersion,
+      createdAt,
+      payloadHash: await sha256(payloadText),
+      payload,
+      resetMetadata
+    };
+    const saved = await this.files.writePersistentBackup({ fileName, data: JSON.stringify(envelope) });
+    return { ...saved, fileName, createdAt };
   }
 
   async restoreBackup(actor: LocalUser, confirmation: string) {

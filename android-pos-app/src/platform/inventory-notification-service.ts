@@ -2,7 +2,8 @@ import { Capacitor } from "@capacitor/core";
 import { LocalNotifications, type PermissionStatus } from "@capacitor/local-notifications";
 import { formatQuantity, type AppSettings, type InventoryAlertRecord } from "../domain/models";
 
-type NotificationAdapter = Pick<typeof LocalNotifications, "addListener" | "checkPermissions" | "createChannel" | "requestPermissions" | "schedule">;
+type NotificationAdapter = Pick<typeof LocalNotifications, "addListener" | "checkPermissions" | "createChannel" | "requestPermissions" | "schedule">
+  & Partial<Pick<typeof LocalNotifications, "cancel" | "getPending" | "removeAllDeliveredNotifications">>;
 
 function notificationId(alertId: string) {
   let hash = 0;
@@ -71,6 +72,14 @@ export class InventoryNotificationService {
       }))
     });
     return enabled.map((alert) => alert.id);
+  }
+
+  async clearAll() {
+    if (!this.isNative()) return;
+    const pending = await this.adapter.getPending?.();
+    if (pending?.notifications.length) await this.adapter.cancel?.({ notifications: pending.notifications });
+    await this.adapter.removeAllDeliveredNotifications?.();
+    this.pendingTarget = null;
   }
 }
 

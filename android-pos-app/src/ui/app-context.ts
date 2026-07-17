@@ -12,6 +12,7 @@ export type AppContextValue = {
   inventoryFocusId: string | null;
   openInventoryProduct: (productId: string) => void;
   openCashDrawer: () => void;
+  restartAfterFactoryReset: () => void;
   clearInventoryFocus: () => void;
 };
 

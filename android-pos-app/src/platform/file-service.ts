@@ -27,6 +27,32 @@ export class FileService {
     return { uri: result.uri, webPath: Capacitor.convertFileSrc(result.uri) };
   }
 
+  async writePersistentBackup(input: { fileName: string; data: string }) {
+    const path = `WholesalePOS Backups/${input.fileName}`;
+    const result = await Filesystem.writeFile({ path, directory: Directory.External, data: input.data, encoding: Encoding.UTF8, recursive: true });
+    const verified = await Filesystem.stat({ path, directory: Directory.External });
+    if (verified.type !== "file" || verified.size <= 0) throw new Error("The backup file could not be verified.");
+    return { uri: result.uri, path, bytes: verified.size };
+  }
+
+  async clearGeneratedLocalFiles() {
+    const generated = [
+      { path: "exports", directory: Directory.Cache },
+      { path: "reports", directory: Directory.Cache },
+      { path: "product-images", directory: Directory.Data },
+      { path: "business-assets", directory: Directory.Data }
+    ];
+    for (const entry of generated) {
+      try {
+        const info = await Filesystem.stat(entry);
+        if (info.type === "directory") await Filesystem.rmdir({ ...entry, recursive: true });
+        else await Filesystem.deleteFile(entry);
+      } catch {
+        // A missing optional directory already satisfies the reset requirement.
+      }
+    }
+  }
+
   async shareFile(input: { fileName: string; uri: string; dialogTitle: string }) {
     await Share.share({ title: input.fileName, dialogTitle: input.dialogTitle, files: [input.uri] });
   }

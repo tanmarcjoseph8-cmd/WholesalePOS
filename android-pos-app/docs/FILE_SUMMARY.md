@@ -18,6 +18,8 @@ Windows application files changed: **none**.
 
 - `src/domain/models.ts`, `calculations.ts`, `security.ts`: typed records, units,
   integer money/quantity calculations, UUID compatibility, and PBKDF2.
+- `src/domain/app-metadata.ts`, `factory-reset-rules.ts`, and
+  `factory-reset-rules.test.ts`: release identity and pure Owner reset guards.
 - `src/domain/cash-drawer.ts`, `cash-drawer.test.ts`: integer cash formulas,
   PHP denomination definitions, and reconciliation records.
 - `src/domain` test files: calculation and credential tests.
@@ -28,12 +30,21 @@ Windows application files changed: **none**.
 - `src/services/cash-drawer-service.ts` and its tests: drawer lifecycle,
   immutable movements, session ownership, corrections, review, and transaction
   linkage for cash sales and refunds.
+- `src/services/factory-reset-service.ts` and its tests: Owner-only guarded reset,
+  persistent pre-reset backup, dependency-ordered transactional deletion,
+  Installation ID regeneration, and post-delete database verification.
+- `src/services/operation-coordinator.ts`: mutual exclusion for checkout and
+  factory reset.
+- `src/services/backup-service.test.ts`: persistent reset-backup metadata and
+  audit-export coverage.
 - `src/services/inventory-alert-service-access.test.ts`: read-only cashier stock
   alert authorization and rejection of users without alert permission.
 - `src/platform` TypeScript files: Android lifecycle, back button, file picker,
   filesystem, share, legacy WebView compatibility, and platform boundaries.
 - `src/ui/App.tsx`, `app-context.ts`, `AuthScreen.tsx`, `ConfirmDialog.tsx`:
   session shell and reusable UI behavior.
+- `src/ui/FactoryResetPanel.tsx`: Owner-only warning, reauthentication, exact
+  phrase, final counts, progress, and success flow.
 - `src/ui/views` TSX files: dashboard, POS, cash drawer, inventory/import,
   restaurant, sales, reports, users, settings, backups, and exports.
 - `src/main.tsx`, `src/styles.css`: application bootstrap and responsive styling.
@@ -60,3 +71,7 @@ Windows application files changed: **none**.
   `product-import-template.csv`,
   `MIGRATION_NOTES.md`, `CASH_DRAWER.md`, `KNOWN_LIMITATIONS.md`, `TEST_REPORT.md`: build,
   operation, recovery, import, migration, constraints, and evidence.
+- `docs/FACTORY_RESET.md`: complete reset behavior, preserved/erased data,
+  backup location, database method, failures, verification, and artifact paths.
+- `docs/factory-reset/*.png`: warning, Owner reauthentication, typed phrase,
+  final confirmation, progress, success, and fresh-setup emulator screenshots.

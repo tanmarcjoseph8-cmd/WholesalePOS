@@ -57,6 +57,18 @@ export class AuthService {
     return toUser(row);
   }
 
+  async reauthenticateOwner(actor: LocalUser, secret: string) {
+    if (actor.role !== "OWNER") throw new Error("Only the Owner can authorize a factory reset.");
+    const rows = await this.db.query<UserRow>(
+      `SELECT u.id, u.name, u.login, u.secret_hash, r.name AS role_name, r.permissions_json
+       FROM users u JOIN roles r ON r.id=u.role_id
+       WHERE u.id=? AND r.name='OWNER' AND u.status='ACTIVE' AND u.deleted_at IS NULL LIMIT 1`,
+      [actor.id]
+    );
+    const row = rows[0];
+    if (!row || !(await verifySecret(secret, row.secret_hash))) throw new Error("The Owner PIN or password is incorrect.");
+  }
+
   async listUsers() {
     const rows = await this.db.query<UserRow>(
       `SELECT u.id, u.name, u.login, u.secret_hash, r.name AS role_name, r.permissions_json
@@ -79,4 +91,3 @@ export class AuthService {
     });
   }
 }
-

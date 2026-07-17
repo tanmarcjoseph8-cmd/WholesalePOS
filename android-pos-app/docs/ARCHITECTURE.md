@@ -40,3 +40,13 @@ No HTTP server, loopback port, remote database, or Windows process is required.
   full catalog without per-product native bridge calls.
 - Backup restore validates format, schema version, and integrity before replacement.
 - Database files are excluded from Android cloud backup to keep operational data local.
+- `FactoryResetService` provides the only in-app destructive reset path. It
+  reauthorizes the stored Owner, verifies the exact phrase and final consent,
+  creates a persistent backup by default, and performs dependency-ordered
+  deletion in one SQLite transaction.
+- The operation coordinator makes checkout and reset mutually exclusive.
+  Migrations also block reset. Post-delete checks require 24 empty business
+  tables, the unchanged schema version, valid foreign keys, and SQLite integrity
+  before commit.
+- Migration 6 stores a local Installation ID in `device_state`; a successful
+  reset regenerates it without changing the app identity or schema.

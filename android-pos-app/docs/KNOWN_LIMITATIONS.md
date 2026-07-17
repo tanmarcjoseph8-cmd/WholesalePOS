@@ -2,6 +2,9 @@
 
 - Data is intentionally local to one tablet; there is no cloud sync, multi-device
   realtime sync, web server, or Windows connection.
+- The Android app has no activation, subscription, licensing, or tutorial
+  subsystem. Owner Factory Reset returns to first-owner setup and regenerates a
+  local Installation ID; it cannot return to a nonexistent activation screen.
 - Direct raw Bluetooth ESC/POS transport is not included. Receipts use Android
   PDF save/share/print services.
 - Card and GCash payments are recorded but not processed through a payment

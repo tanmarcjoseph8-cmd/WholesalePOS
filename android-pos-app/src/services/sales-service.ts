@@ -4,6 +4,7 @@ import { assertSufficientPayment, lineTotals, saleTotals, toBaseQuantity } from 
 import { createId, nowIso, type CartLine, type SaleCommand, type SaleSummary, type UnitCode } from "../domain/models";
 import { audit, nextNumber } from "./service-helpers";
 import { recordAutomaticCashMovement } from "./cash-drawer-service";
+import { operationCoordinator, type OperationCoordinator } from "./operation-coordinator";
 
 type ProductSaleRow = {
   id: string;
@@ -45,7 +46,7 @@ export type SaleDetail = SaleSummary & {
 };
 
 export class SalesService {
-  constructor(private db: LocalDatabase) {}
+  constructor(private db: LocalDatabase, private operations: OperationCoordinator = operationCoordinator) {}
 
   private async saleSummary(id: string) {
     const rows = await this.db.query<{
@@ -75,11 +76,13 @@ export class SalesService {
   }
 
   async completeSale(command: SaleCommand) {
-    const existing = await this.db.query<{ id: string }>("SELECT id FROM sales WHERE request_key=?", [command.requestKey]);
-    if (existing[0]) return this.saleSummary(existing[0].id);
-    if (!command.lines.length && !command.orderId) throw new Error("Add at least one item before completing the sale.");
+    const releasePayment = this.operations.beginPayment();
+    try {
+      const existing = await this.db.query<{ id: string }>("SELECT id FROM sales WHERE request_key=?", [command.requestKey]);
+      if (existing[0]) return await this.saleSummary(existing[0].id);
+      if (!command.lines.length && !command.orderId) throw new Error("Add at least one item before completing the sale.");
 
-    return this.db.transaction(async () => {
+      return await this.db.transaction(async () => {
       const repeated = await this.db.query<{ id: string }>("SELECT id FROM sales WHERE request_key=?", [command.requestKey]);
       if (repeated[0]) return this.saleSummary(repeated[0].id);
 
@@ -226,7 +229,10 @@ export class SalesService {
       }
       await audit(this.db, { actorId: command.cashierId, action: "SALE_COMPLETED", entityType: "Sale", entityId: saleId, metadata: { receiptNumber, orderNumber, grandTotalCents: totals.grandTotalCents } });
       return this.saleSummary(saleId);
-    });
+      });
+    } finally {
+      releasePayment();
+    }
   }
 
   async listSales(limit = 200) {

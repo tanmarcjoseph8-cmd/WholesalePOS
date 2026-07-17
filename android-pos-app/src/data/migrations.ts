@@ -474,6 +474,17 @@ UPDATE roles SET permissions_json='["sales.manage","orders.manage","products.vie
     sql: `
 UPDATE roles SET permissions_json='["sales.manage","orders.manage","products.view","inventory.alerts.view","cash_drawer.use"]' WHERE id='role_cashier';
 `
+  },
+  {
+    version: 6,
+    name: "persistent_device_identity",
+    sql: `
+CREATE TABLE IF NOT EXISTS device_state (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
   }
 ];
 
