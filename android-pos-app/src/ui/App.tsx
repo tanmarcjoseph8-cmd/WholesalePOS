@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
-import { BarChart3, Bell, BellRing, Boxes, ClipboardList, LayoutDashboard, LogOut, RefreshCw, Settings, ShoppingCart, Store, Utensils, WalletCards } from "lucide-react";
+import { BarChart3, Bell, BellRing, Boxes, ClipboardList, LayoutDashboard, LogOut, RefreshCw, Settings, ShoppingCart, Utensils, WalletCards } from "lucide-react";
+import sukiSyncLogo from "../assets/suki-sync-logo.png";
 import type { AppSettings, LocalUser } from "../domain/models";
 import { inventoryAlertMessage } from "../domain/inventory-alerts";
 import { lifecycleService } from "../platform/lifecycle";
@@ -9,7 +10,7 @@ import { AppContext } from "./app-context";
 import { AuthScreen } from "./AuthScreen";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ActivationScreen } from "./ActivationScreen";
-import type { MobileLicenseStatus } from "../services/license-service";
+import { isUsableLicenseStatus, type MobileLicenseStatus } from "../services/license-service";
 
 const DashboardView = lazy(() => import("./views/DashboardView").then((module) => ({ default: module.DashboardView })));
 const InventoryView = lazy(() => import("./views/InventoryView").then((module) => ({ default: module.InventoryView })));
@@ -56,7 +57,7 @@ export function App() {
   useEffect(() => {
     let active = true;
     void offlineApp.initialize().then(async () => {
-      const [setup, loadedSettings, loadedLicense] = await Promise.all([offlineApp.auth.requiresSetup(), offlineApp.settingsReports.getSettings(), offlineApp.license.getStatus()]);
+      const [setup, loadedSettings, loadedLicense] = await Promise.all([offlineApp.auth.requiresSetup(), offlineApp.settingsReports.getSettings(), offlineApp.license.getStatus("launch")]);
       if (!active) return;
       setRequiresSetup(setup); setSettings(loadedSettings); setLicenseStatus(loadedLicense); document.documentElement.dataset.theme = loadedSettings.darkMode ? "dark" : "light"; setBootState("ready");
     }).catch((error: unknown) => { if (active) { setBootError(error instanceof Error ? error.message : "The local database could not start."); setBootState("error"); } });
@@ -73,7 +74,7 @@ export function App() {
 
   useEffect(() => {
     if (bootState !== "ready") return;
-    void lifecycleService.register({ hasUnsavedWork: () => unsavedRef.current, onResume: () => setRevision((value) => value + 1), onPause: () => undefined, onBackAtRoot: () => void CapacitorApp.exitApp() });
+    void lifecycleService.register({ hasUnsavedWork: () => unsavedRef.current, onResume: () => { setRevision((value) => value + 1); void offlineApp.license.getStatus("resume").then(setLicenseStatus); }, onPause: () => undefined, onBackAtRoot: () => void CapacitorApp.exitApp() });
     const confirmLeave = () => setLeaveOpen(true);
     const openInventoryAlert = (event: Event) => {
       const detail = (event as CustomEvent<{ productId?: string; alertId?: string }>).detail;
@@ -91,12 +92,14 @@ export function App() {
     window.addEventListener("pos:confirm-leave", confirmLeave);
     window.addEventListener("pos:open-inventory-alert", openInventoryAlert);
     window.addEventListener("pos:inventory-alerts-created", alertsCreated);
+    const licenseChanged = (event: Event) => setLicenseStatus((event as CustomEvent<MobileLicenseStatus>).detail);
+    window.addEventListener("pos:license-status-changed", licenseChanged);
     const pendingTarget = user ? offlineApp.inventoryNotifications.consumePendingTarget() : null;
     const canViewInventory = Boolean(user && (user.permissions.includes("*") || user.permissions.includes("inventory.view") || user.permissions.includes("inventory.manage")));
     const canViewAlerts = Boolean(user && (canViewInventory || user.permissions.includes("inventory.alerts.view")));
     if (pendingTarget && canViewInventory) { setInventoryFocusId(pendingTarget.productId); setPendingAlertId(pendingTarget.alertId ?? null); setView("inventory"); }
     else if (pendingTarget && canViewAlerts) { setPendingAlertId(pendingTarget.alertId ?? null); setView("alerts"); }
-    return () => { window.removeEventListener("pos:confirm-leave", confirmLeave); window.removeEventListener("pos:open-inventory-alert", openInventoryAlert); window.removeEventListener("pos:inventory-alerts-created", alertsCreated); void lifecycleService.removeAll(); };
+    return () => { window.removeEventListener("pos:confirm-leave", confirmLeave); window.removeEventListener("pos:open-inventory-alert", openInventoryAlert); window.removeEventListener("pos:inventory-alerts-created", alertsCreated); window.removeEventListener("pos:license-status-changed", licenseChanged); void lifecycleService.removeAll(); };
   }, [bootState, user]);
 
   useEffect(() => {
@@ -129,9 +132,9 @@ export function App() {
   }
 
   if (bootState === "booting") return <main className="boot-page"><RefreshCw className="spin" size={32} /><strong>Opening secure local database</strong></main>;
-  if (bootState === "error") return <main className="boot-page error"><DatabaseError /><h1>WholesalePOS could not start</h1><p>{bootError}</p><button className="button primary" onClick={() => window.location.reload()}>Try again</button></main>;
+  if (bootState === "error") return <main className="boot-page error"><DatabaseError /><h1>Suki Sync could not start</h1><p>{bootError}</p><button className="button primary" onClick={() => window.location.reload()}>Try again</button></main>;
   if (!licenseStatus) return <main className="boot-page"><RefreshCw className="spin" size={32} /><strong>Checking offline activation</strong></main>;
-  if (licenseStatus.state !== "ACTIVE") return <ActivationScreen app={offlineApp} status={licenseStatus} onActivated={setLicenseStatus} />;
+  if (!isUsableLicenseStatus(licenseStatus)) return <ActivationScreen app={offlineApp} status={licenseStatus} onActivated={setLicenseStatus} />;
   if (!user) return <AuthScreen app={offlineApp} requiresSetup={requiresSetup} onAuthenticated={(authenticated) => { setUser(authenticated); setRequiresSetup(false); void offlineApp.inventoryAlerts.reconcileAndNotify(); }} />;
 
   const allowedViews = views.filter((entry) => {
@@ -148,9 +151,9 @@ export function App() {
   return (
     <AppContext.Provider value={{ app: offlineApp, user, revision, refresh, setUnsaved, notify, inventoryFocusId, openInventoryProduct, openCashDrawer: () => navigate("cash-drawer"), restartAfterFactoryReset: () => { unsavedRef.current = false; setUser(null); setRequiresSetup(true); setView("dashboard"); window.location.reload(); }, clearInventoryFocus: () => setInventoryFocusId(null) }}>
       <div className="app-shell">
-        <aside className="sidebar" aria-label="Application navigation"><div className="brand"><div className="brand-symbol"><Store size={21} /></div><div><strong>{settings?.businessName ?? "WholesalePOS"}</strong><span>Offline Android</span></div></div><nav aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={effectiveView === id ? "active" : ""} aria-current={effectiveView === id ? "page" : undefined} key={id} onClick={() => navigate(id)} title={label}><Icon size={21} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav><div className="account"><div className="account-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.name}</strong><span>{user.role}</span></div><button type="button" aria-label="Lock tablet" title="Lock tablet" onClick={() => { unsavedRef.current = false; setUser(null); setView("dashboard"); }}><LogOut size={20} /></button></div></aside>
-        <header className="mobile-header"><div className="brand-symbol"><Store size={20} /></div><strong>{settings?.businessName ?? "WholesalePOS"}</strong>{allowedViews.some((entry) => entry.id === "alerts") ? <button type="button" className="mobile-alert-button" aria-label={`${unreadAlerts} unread inventory alerts`} onClick={() => navigate("alerts")}><Bell size={20} />{unreadAlerts > 0 ? <b>{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button> : null}<button type="button" aria-label="Refresh local data" onClick={refresh}><RefreshCw size={20} /></button></header>
-        <main className="app-content"><Suspense fallback={<p className="loading" role="status">Opening local screen...</p>}><CurrentView /></Suspense></main>
+        <aside className="sidebar" aria-label="Application navigation"><div className="brand"><div className="brand-symbol"><img src={sukiSyncLogo} alt="" /></div><div><strong>{settings?.businessName ?? "Suki Sync"}</strong><span>Suki Sync</span></div></div><nav aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={effectiveView === id ? "active" : ""} aria-current={effectiveView === id ? "page" : undefined} key={id} onClick={() => navigate(id)} title={label}><Icon size={21} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav><div className="account"><div className="account-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div><div><strong>{user.name}</strong><span>{user.role}</span></div><button type="button" aria-label="Lock tablet" title="Lock tablet" onClick={() => { unsavedRef.current = false; setUser(null); setView("dashboard"); }}><LogOut size={20} /></button></div></aside>
+        <header className="mobile-header"><div className="brand-symbol"><img src={sukiSyncLogo} alt="" /></div><strong>{settings?.businessName ?? "Suki Sync"}</strong>{allowedViews.some((entry) => entry.id === "alerts") ? <button type="button" className="mobile-alert-button" aria-label={`${unreadAlerts} unread inventory alerts`} onClick={() => navigate("alerts")}><Bell size={20} />{unreadAlerts > 0 ? <b>{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button> : null}<button type="button" aria-label="Refresh local data" onClick={refresh}><RefreshCw size={20} /></button></header>
+        <main className="app-content">{licenseStatus.warningThreshold && (user.permissions.includes("*") || user.permissions.includes("settings.manage")) ? <section className="license-warning-banner" role="status"><div><strong>License expires in {licenseStatus.daysRemaining} day{licenseStatus.daysRemaining === 1 ? "" : "s"}</strong><span>Renew early to keep checkout available without interruption.</span></div><button className="button secondary" onClick={() => void offlineApp.license.dismissWarning(licenseStatus).then(setLicenseStatus)}>Dismiss</button></section> : null}<Suspense fallback={<p className="loading" role="status">Opening local screen...</p>}><CurrentView /></Suspense></main>
         <nav className="bottom-nav" aria-label="Main screens">{allowedViews.map(({ id, label, icon: Icon }) => <button type="button" className={effectiveView === id ? "active" : ""} aria-current={effectiveView === id ? "page" : undefined} key={id} onClick={() => navigate(id)}><Icon size={20} /><span>{label}</span>{id === "alerts" && unreadAlerts > 0 ? <b className="nav-badge">{unreadAlerts > 99 ? "99+" : unreadAlerts}</b> : null}</button>)}</nav>
         {toast ? <div className={`toast ${toast.tone}`} role="status" key={toast.id}>{toast.message}</div> : null}
         <ConfirmDialog open={leaveOpen} title="Discard unsaved changes?" confirmLabel="Discard changes" destructive onClose={() => { pendingView.current = null; setLeaveOpen(false); }} onConfirm={discardAndLeave}><p>Your saved database records are safe. Only the changes currently shown on this screen will be discarded.</p></ConfirmDialog>

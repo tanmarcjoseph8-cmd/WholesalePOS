@@ -5,6 +5,7 @@
 - License generation and customer records are intentionally offline in the
   owner's Windows License Manager. Revoking, archiving, or replacing a record
   cannot remotely disable a tablet that is already activated and offline.
+  Monthly and yearly signed expiration is still enforced by the tablet.
 - Direct raw Bluetooth ESC/POS transport is not included. Receipts use Android
   PDF save/share/print services.
 - Card and GCash payments are recorded but not processed through a payment
@@ -14,6 +15,9 @@
 - Android backups are integrity protected JSON but are not encrypted files.
 - Activation is device-bound. A backup restored on a different tablet cannot
   transfer the license; clearing storage or uninstalling requires reissue.
+- Deliberately clearing all Android app storage also clears the Keystore-backed
+  verification state and activation record. It does not provide a way to retain
+  or bypass a renewable license because the app returns to activation.
 - The release is signed with a private self-managed key, not a public app-store
   identity. Preserve that key for updates.
 - The automated device run used an Android 10 emulator. The build and dependency

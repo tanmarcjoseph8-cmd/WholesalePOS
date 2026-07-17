@@ -25,6 +25,23 @@ export function generateSigningAuthority() {
 
 /** Serializes activation claims in the single canonical field order used by all platforms. */
 export function canonicalActivationPayload(payload: ActivationPayload) {
+  if (payload.version === 2) {
+    return JSON.stringify({
+      format: payload.format,
+      version: payload.version,
+      licenseId: payload.licenseId,
+      licenseSerialNumber: payload.licenseSerialNumber,
+      customerId: payload.customerId,
+      deviceId: payload.deviceId,
+      productId: payload.productId,
+      productName: payload.productName,
+      productVersion: payload.productVersion,
+      edition: payload.edition,
+      licenseType: payload.licenseType,
+      issuedAt: payload.issuedAt,
+      expiresAt: payload.expiresAt
+    });
+  }
   return JSON.stringify({
     format: payload.format,
     version: payload.version,
@@ -55,7 +72,8 @@ export function verifyActivationCode(code: string, publicKeyJwk: JsonWebKey) {
   const publicKey = createPublicKey({ key: publicKeyJwk as NodeJsonWebKey, format: "jwk" });
   if (!verify("sha256", payloadBytes, { key: publicKey, dsaEncoding: "ieee-p1363" }, signature)) throw new Error("Activation signature is invalid.");
   const payload = JSON.parse(payloadBytes.toString("utf8")) as ActivationPayload;
-  if (canonicalActivationPayload(payload) !== payloadBytes.toString("utf8") || payload.format !== "WPOS-LICENSE" || payload.version !== 1) throw new Error("Activation payload is invalid.");
+  if (canonicalActivationPayload(payload) !== payloadBytes.toString("utf8") || payload.format !== "WPOS-LICENSE" || ![1, 2].includes(payload.version)) throw new Error("Activation payload is invalid.");
+  if (payload.version === 2 && (!payload.licenseSerialNumber || !payload.customerId || !["MONTHLY", "YEARLY", "LIFETIME"].includes(payload.licenseType) || (payload.licenseType === "LIFETIME" ? payload.expiresAt !== null : !payload.expiresAt))) throw new Error("Activation payload is invalid.");
   return payload;
 }
 

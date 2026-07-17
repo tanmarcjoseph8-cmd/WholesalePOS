@@ -1,10 +1,9 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
   base: "./",
   build: { outDir: "dist", emptyOutDir: true },
-  server: { port: 4180 },
-  test: { include: ["src/**/*.test.ts"] }
+  server: { port: 4180 }
 });

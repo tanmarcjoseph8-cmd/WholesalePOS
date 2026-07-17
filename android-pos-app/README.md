@@ -1,6 +1,7 @@
-# WholesalePOS Offline Android
+# Suki Sync Android
 
-This folder is an independent Android tablet edition of WholesalePOS. It does not import, modify, or package the Windows Electron backend.
+This folder is the independent, fully offline Android tablet edition of Suki
+Sync. It does not require a server or package the Windows Electron backend.
 
 ## Platform baseline
 
@@ -15,9 +16,9 @@ See `docs/AUDIT.md` for the Windows compatibility audit and `docs/ARCHITECTURE.m
 
 ## Installable builds
 
-- `apk/WholesalePOS-Offline-0.6.0-release.apk`: signed APK for direct tablet installation
-- `apk/WholesalePOS-Offline-0.6.0-debug.apk`: development APK
-- `apk/WholesalePOS-Offline-0.6.0-release.aab`: signed Android App Bundle
+- `apk/Suki-Sync-0.7.0-release.apk`: signed APK for direct tablet installation
+- `apk/Suki-Sync-0.7.0-debug.apk`: development APK
+- `apk/Suki-Sync-0.7.0-release.aab`: signed Android App Bundle
 - `apk/checksums.json`: SHA-256 checksums for all artifacts
 
 Start with [Build and installation](docs/BUILD_AND_INSTALL.md), then read [Backup and restore](docs/BACKUP_RESTORE.md) before entering live business data.

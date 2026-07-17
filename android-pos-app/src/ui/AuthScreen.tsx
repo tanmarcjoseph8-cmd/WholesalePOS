@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { LockKeyhole, ShieldCheck } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
+import sukiSyncLogo from "../assets/suki-sync-logo.png";
 import type { LocalUser } from "../domain/models";
 import type { OfflinePosApplication } from "../services/offline-app";
 
 export function AuthScreen({ app, requiresSetup, onAuthenticated }: { app: OfflinePosApplication; requiresSetup: boolean; onAuthenticated: (user: LocalUser) => void }) {
   const [name, setName] = useState("");
-  const [businessName, setBusinessName] = useState("WholesalePOS Store");
+  const [businessName, setBusinessName] = useState("Suki Sync Store");
   const [login, setLogin] = useState("");
   const [secret, setSecret] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +31,7 @@ export function AuthScreen({ app, requiresSetup, onAuthenticated }: { app: Offli
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <div className="auth-brand"><div className="brand-mark"><ShieldCheck size={28} /></div><p className="eyebrow">WholesalePOS</p></div>
+        <div className="auth-brand"><img className="brand-mark brand-logo" src={sukiSyncLogo} alt="Suki Sync" /><p className="eyebrow">Suki Sync</p></div>
         <h1>{requiresSetup ? "Set up this tablet" : "Unlock this tablet"}</h1>
         <p className="muted">All operational data stays on this Android device.</p>
         <form onSubmit={submit} className="form-stack">

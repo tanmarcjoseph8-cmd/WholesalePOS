@@ -11,9 +11,11 @@ import type {
   LicenseManagerPreferences,
   LicenseRecord,
   LicenseStatus,
+  LicenseType,
   LicenseVaultData,
   LicensedProduct,
-  ManagerSnapshot
+  ManagerSnapshot,
+  RenewLicenseInput
 } from "../shared/contracts.js";
 import {
   createActivationCode,
@@ -45,10 +47,30 @@ export type ImportedLicenseRow = {
 const now = () => new Date().toISOString();
 const clean = (value: string) => value.trim();
 const cleanDeviceId = (value: string) => value.trim().toUpperCase();
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function addUtcMonths(value: Date, months: number) {
+  const result = new Date(value);
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
+}
+
+function expirationFor(issuedAt: string, licenseType: LicenseType) {
+  if (licenseType === "LIFETIME") return null;
+  return addUtcMonths(new Date(issuedAt), licenseType === "MONTHLY" ? 1 : 12).toISOString();
+}
+
+function serialNumber(issuedAt: string) {
+  return `WPOS-${issuedAt.slice(0, 4)}-${randomBytes(5).toString("hex").toUpperCase()}`;
+}
 
 function defaultProducts(): LicensedProduct[] {
   return [
-    { id: "WHOLESALE_POS_ANDROID", productName: "WholesalePOS Android", productVersion: "0.6.0", edition: "Restaurant", active: true },
+    { id: "WHOLESALE_POS_ANDROID", productName: "Suki Sync Android", productVersion: "0.7.0", edition: "Restaurant", active: true },
     { id: "POS_STANDARD", productName: "POS Standard", productVersion: "1.0", edition: "Standard", active: true },
     { id: "INVENTORY_PRO", productName: "Inventory Pro", productVersion: "1.0", edition: "Pro", active: true }
   ];
@@ -95,7 +117,7 @@ export class LicenseVaultStore {
     const envelope = JSON.parse(await readFile(this.vaultPath, "utf8")) as EncryptedVaultEnvelope;
     const unlocked = decryptVault(envelope, password);
     this.lock();
-    this.data = unlocked.data;
+    this.data = this.normalizeVault(unlocked.data);
     this.key = unlocked.key;
     this.salt = unlocked.salt;
     return this.snapshot();
@@ -135,11 +157,34 @@ export class LicenseVaultStore {
     const product = data.products.find((entry) => entry.id === input.productId && entry.active);
     if (!product) throw new Error("Select an active product.");
     const customer = this.resolveCustomer(input);
-    const license = this.buildLicense(customer, deviceId, product, input.appVersion, input.licenseNotes);
+    const license = this.buildLicense(customer, deviceId, product, input.appVersion, input.licenseNotes, { licenseType: input.licenseType });
     data.licenses.push(license);
     this.appendEvent("GENERATED", customer, license, input.licenseNotes);
     await this.save();
     return { kind: "CREATED", license: this.toListItem(license) };
+  }
+
+  /** Generates a new signed entitlement for the same tablet while permanently preserving the previous license. */
+  async renewLicense(input: RenewLicenseInput) {
+    const data = this.requireUnlocked();
+    const previous = this.requireLicense(input.licenseId);
+    const deviceId = cleanDeviceId(input.deviceId);
+    if (deviceId !== previous.deviceId) throw new Error("Device ID does not match the selected license.");
+    if (previous.status === "REPLACED" || previous.status === "REVOKED") throw new Error("This historical license cannot be renewed.");
+    if (data.licenses.some((license) => license.id !== previous.id && license.deviceId === deviceId && license.status === "ACTIVE")) throw new Error("Select the current active license for this Device ID.");
+    const customer = this.requireCustomer(previous.customerId);
+    const product = data.products.find((entry) => entry.id === previous.productId);
+    if (!product) throw new Error("The licensed product is no longer configured.");
+    const renewed = this.buildLicense(customer, deviceId, product, previous.appVersion, input.administratorNotes, { licenseType: input.licenseType, renewalForLicenseId: previous.id });
+    const renewedAt = now();
+    previous.status = "ARCHIVED";
+    previous.renewedByLicenseId = renewed.id;
+    previous.renewalDate = renewedAt;
+    previous.lastModifiedDate = renewedAt;
+    data.licenses.push(renewed);
+    this.appendEvent("RENEWED", customer, renewed, input.administratorNotes || `Renewed ${previous.licenseSerialNumber}.`, previous.expirationDate, renewed.expirationDate);
+    await this.save();
+    return this.toListItem(renewed);
   }
 
   /** Records a permanent reissue event while returning the exact original activation code. */
@@ -163,7 +208,7 @@ export class LicenseVaultStore {
     const customer = this.requireCustomer(oldLicense.customerId);
     const product = data.products.find((entry) => entry.id === oldLicense.productId);
     if (!product) throw new Error("The licensed product is no longer configured.");
-    const replacement = this.buildLicense(customer, newDeviceId, product, input.appVersion || oldLicense.appVersion, input.notes, oldLicense.id);
+    const replacement = this.buildLicense(customer, newDeviceId, product, input.appVersion || oldLicense.appVersion, input.notes, { replacementForLicenseId: oldLicense.id, licenseType: oldLicense.licenseType, expirationDate: oldLicense.expirationDate });
     const replacedAt = now();
     oldLicense.status = "REPLACED";
     oldLicense.replacedByLicenseId = replacement.id;
@@ -299,9 +344,16 @@ export class LicenseVaultStore {
       edition: payload.edition,
       notes: clean(row.notes),
       status: row.status,
+      licenseType: payload.version === 2 ? payload.licenseType : "LIFETIME",
+      issueDate: payload.issuedAt,
+      expirationDate: payload.version === 2 ? payload.expiresAt : null,
+      licenseSerialNumber: payload.version === 2 ? payload.licenseSerialNumber : payload.licenseId,
       replacementForLicenseId: null,
       replacedByLicenseId: null,
-      replacementDate: null
+      replacementDate: null,
+      renewalForLicenseId: null,
+      renewedByLicenseId: null,
+      renewalDate: null
     };
     data.licenses.push(license);
     this.appendEvent("IMPORTED", customer, license, "Imported from a verified spreadsheet export.");
@@ -348,25 +400,54 @@ export class LicenseVaultStore {
     return customer;
   }
 
-  private buildLicense(customer: CustomerRecord, deviceId: string, product: LicensedProduct, appVersion: string, notes: string, replacementForLicenseId: string | null = null) {
+  private buildLicense(customer: CustomerRecord, deviceId: string, product: LicensedProduct, appVersion: string, notes: string, options: { licenseType: LicenseType; replacementForLicenseId?: string | null; renewalForLicenseId?: string | null; expirationDate?: string | null }) {
     const data = this.requireUnlocked();
     const issuedAt = now();
     const id = randomUUID();
-    const activationCode = createActivationCode(data.privateKeyPem, { format: "WPOS-LICENSE", version: 1, licenseId: id, deviceId, productId: product.id, productName: product.productName, productVersion: product.productVersion, edition: product.edition, issuedAt });
+    const licenseSerialNumber = serialNumber(issuedAt);
+    const expirationDate = options.expirationDate === undefined ? expirationFor(issuedAt, options.licenseType) : options.expirationDate;
+    const activationCode = createActivationCode(data.privateKeyPem, { format: "WPOS-LICENSE", version: 2, licenseId: id, licenseSerialNumber, customerId: customer.id, deviceId, productId: product.id, productName: product.productName, productVersion: product.productVersion, edition: product.edition, licenseType: options.licenseType, issuedAt, expiresAt: expirationDate });
     return {
       id, customerId: customer.id, deviceId, activationCode, activationDate: issuedAt, lastModifiedDate: issuedAt,
       appVersion: clean(appVersion) || product.productVersion, productId: product.id, productName: product.productName,
       productVersion: product.productVersion, edition: product.edition, notes: clean(notes), status: "ACTIVE" as const,
-      replacementForLicenseId, replacedByLicenseId: null, replacementDate: null
+      licenseType: options.licenseType, issueDate: issuedAt, expirationDate, licenseSerialNumber,
+      replacementForLicenseId: options.replacementForLicenseId ?? null, replacedByLicenseId: null, replacementDate: null,
+      renewalForLicenseId: options.renewalForLicenseId ?? null, renewedByLicenseId: null, renewalDate: options.renewalForLicenseId ? issuedAt : null
     } satisfies LicenseRecord;
   }
 
-  private appendEvent(type: ActivationEvent["type"], customer: CustomerRecord, license: LicenseRecord, notes: string) {
-    this.requireUnlocked().activationEvents.push({ id: randomUUID(), timestamp: now(), type, customerId: customer.id, licenseId: license.id, customerName: customer.customerName, deviceId: license.deviceId, activationCode: license.activationCode, softwareVersion: license.appVersion, notes: clean(notes) });
+  private appendEvent(type: ActivationEvent["type"], customer: CustomerRecord, license: LicenseRecord, notes: string, oldExpirationDate: string | null = null, newExpirationDate: string | null = license.expirationDate) {
+    this.requireUnlocked().activationEvents.push({ id: randomUUID(), timestamp: now(), type, customerId: customer.id, licenseId: license.id, customerName: customer.customerName, deviceId: license.deviceId, activationCode: license.activationCode, softwareVersion: license.appVersion, notes: clean(notes), oldExpirationDate, newExpirationDate, licenseType: license.licenseType });
   }
 
   private toListItem(license: LicenseRecord): LicenseListItem {
-    return { ...structuredClone(license), customer: structuredClone(this.requireCustomer(license.customerId)) };
+    const daysRemaining = license.expirationDate === null ? null : Math.max(0, Math.ceil((Date.parse(license.expirationDate) - Date.now()) / DAY_MS));
+    const displayStatus = license.status !== "ACTIVE" ? license.status : license.licenseType === "LIFETIME" ? "LIFETIME" : Date.now() > Date.parse(license.expirationDate!) ? "EXPIRED" : daysRemaining! <= 30 ? "EXPIRING_SOON" : "ACTIVE";
+    return { ...structuredClone(license), customer: structuredClone(this.requireCustomer(license.customerId)), displayStatus, daysRemaining };
+  }
+
+  private normalizeVault(data: LicenseVaultData) {
+    const androidProduct = data.products.find((product) => product.id === "WHOLESALE_POS_ANDROID");
+    if (androidProduct) { androidProduct.productName = "Suki Sync Android"; androidProduct.productVersion = "0.7.0"; }
+    for (const license of data.licenses) {
+      const legacy = license as LicenseRecord & Record<string, unknown>;
+      legacy.licenseType = (legacy.licenseType as LicenseType | undefined) ?? "LIFETIME";
+      legacy.issueDate = (legacy.issueDate as string | undefined) ?? license.activationDate;
+      legacy.expirationDate = (legacy.expirationDate as string | null | undefined) ?? null;
+      legacy.licenseSerialNumber = (legacy.licenseSerialNumber as string | undefined) ?? license.id;
+      legacy.renewalForLicenseId = (legacy.renewalForLicenseId as string | null | undefined) ?? null;
+      legacy.renewedByLicenseId = (legacy.renewedByLicenseId as string | null | undefined) ?? null;
+      legacy.renewalDate = (legacy.renewalDate as string | null | undefined) ?? null;
+    }
+    for (const event of data.activationEvents) {
+      const legacy = event as ActivationEvent & Record<string, unknown>;
+      const license = data.licenses.find((entry) => entry.id === event.licenseId);
+      legacy.oldExpirationDate = (legacy.oldExpirationDate as string | null | undefined) ?? null;
+      legacy.newExpirationDate = (legacy.newExpirationDate as string | null | undefined) ?? license?.expirationDate ?? null;
+      legacy.licenseType = (legacy.licenseType as LicenseType | undefined) ?? license?.licenseType ?? "LIFETIME";
+    }
+    return data;
   }
 
   private async save() {

@@ -51,13 +51,18 @@ No HTTP server, loopback port, remote database, or Windows process is required.
 - Migration 6 stores a local Installation ID in `device_state`; a successful
   reset regenerates it without changing the app identity or schema.
 - Migration 7 stores the signed, device-bound activation in `license_state`.
-  Startup verifies its P-256 signature with an embedded public JWK before any
-  business screen opens. Factory reset deliberately preserves this table.
+  Migration 8 adds renewable term, expiration, and serial metadata without
+  rewriting business records. Startup, resume, and checkout verify the P-256
+  signature with an embedded public JWK. Factory reset deliberately preserves
+  this table.
 
 ## License boundary
 
 Android contains only public-key verification, stable Device ID derivation, and
-the local signed activation record. Customer management and code signing live in
+the local signed activation record. Last verified time and warning dismissals
+are encrypted through an Android Keystore native plugin so clock rollback is
+detected without placing private authority material on the tablet. Customer
+management, renewal history, and code signing live in
 the separate Windows License Manager. Its main Electron process owns the private
 key, encrypted vault, imports, exports, printing, and backups. The sandboxed
 renderer receives only narrow IPC operations and never key material. This

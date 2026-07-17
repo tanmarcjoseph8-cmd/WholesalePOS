@@ -46,7 +46,7 @@ export type SaleDetail = SaleSummary & {
 };
 
 export class SalesService {
-  constructor(private db: LocalDatabase, private operations: OperationCoordinator = operationCoordinator) {}
+  constructor(private db: LocalDatabase, private operations: OperationCoordinator = operationCoordinator, private protectedOperation: () => Promise<unknown> = async () => undefined) {}
 
   private async saleSummary(id: string) {
     const rows = await this.db.query<{
@@ -76,6 +76,7 @@ export class SalesService {
   }
 
   async completeSale(command: SaleCommand) {
+    await this.protectedOperation();
     const releasePayment = this.operations.beginPayment();
     try {
       const existing = await this.db.query<{ id: string }>("SELECT id FROM sales WHERE request_key=?", [command.requestKey]);
@@ -266,7 +267,7 @@ export class SalesService {
     return {
       id: sale.id, receiptNumber: sale.receipt_number, orderNumber: sale.order_number, orderType: sale.order_type, status: sale.status,
       grandTotalCents: Number(sale.grand_total_cents), paidTotalCents: Number(sale.paid_total_cents), changeTotalCents: Number(sale.change_total_cents), createdAt: sale.created_at,
-      businessName: setting.businessName ?? "WholesalePOS Offline", cashierName: sale.cashier_name, subtotalCents: Number(sale.subtotal_cents),
+      businessName: setting.businessName ?? "Suki Sync Store", cashierName: sale.cashier_name, subtotalCents: Number(sale.subtotal_cents),
       discountCents: Number(sale.discount_cents), taxCents: Number(sale.tax_cents), serviceChargeCents: Number(sale.service_charge_cents), tipCents: Number(sale.tip_cents),
       lines: lineRows.map((line) => ({ id: line.id, productId: line.product_id, name: line.name, soldQuantityMicro: Number(line.sold_quantity_micro), refundedQuantityMicro: Number(line.refunded_quantity_micro), soldUnit: line.sold_unit, unitPriceCents: Number(line.unit_price_cents), lineTotalCents: Number(line.line_total_cents) })),
       payments: paymentRows.map((payment) => ({ method: payment.method, amountCents: Number(payment.amount_cents), reference: payment.reference }))

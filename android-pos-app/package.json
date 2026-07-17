@@ -1,9 +1,9 @@
 {
   "name": "wholesalepos-offline-android",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
-  "description": "Independent offline Android tablet edition of WholesalePOS.",
+  "description": "Suki Sync independent offline Android tablet POS.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",

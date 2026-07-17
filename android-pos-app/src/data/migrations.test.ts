@@ -5,8 +5,8 @@ describe("offline database migrations", () => {
   const sql = migrations.map((migration) => migration.sql).join("\n").toLowerCase();
 
   it("uses ordered, non-destructive migration versions", () => {
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(currentSchemaVersion).toBe(7);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(currentSchemaVersion).toBe(8);
     expect(sql).not.toMatch(/\bdrop\s+(table|column|index)\b/);
   });
 

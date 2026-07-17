@@ -1,7 +1,8 @@
 # File Summary
 
-All created or modified files are contained in `android-pos-app/`. Existing
-Windows application files changed: **none**.
+Android changes are contained in `android-pos-app/`. The companion offline
+Windows authority is updated separately under `license-manager/` to issue and
+renew compatible signed licenses.
 
 ## Project and build
 
@@ -33,12 +34,14 @@ Windows application files changed: **none**.
 - `src/services/factory-reset-service.ts` and its tests: Owner-only guarded reset,
   persistent pre-reset backup, dependency-ordered transactional deletion,
   Installation ID regeneration, and post-delete database verification.
-- `src/domain/license-code.ts`, `license-public-key.ts`, and tests: canonical
-  activation payload parsing and P-256 offline signature verification.
+- `src/domain/license-code.ts`, `license-public-key.ts`, and tests: versioned,
+  canonical activation payload parsing, renewable terms, and P-256 offline
+  signature verification with legacy lifetime compatibility.
 - `src/platform/device-identity.ts` and tests: stable, non-secret license Device
   ID derived from Android's app-scoped identifier.
-- `src/services/license-service.ts`: device-bound activation persistence and
-  startup status verification isolated from business services.
+- `src/services/license-service.ts`: device-bound activation persistence,
+  startup/resume/checkout verification, expiration warnings, and renewal status
+  isolated from business services.
 - `src/services/operation-coordinator.ts`: mutual exclusion for checkout and
   factory reset.
 - `src/services/backup-service.test.ts`: persistent reset-backup metadata and
@@ -46,7 +49,8 @@ Windows application files changed: **none**.
 - `src/services/inventory-alert-service-access.test.ts`: read-only cashier stock
   alert authorization and rejection of users without alert permission.
 - `src/platform` TypeScript files: Android lifecycle, back button, file picker,
-  filesystem, share, legacy WebView compatibility, and platform boundaries.
+  filesystem, share, Keystore-backed license state, legacy WebView
+  compatibility, and platform boundaries.
 - `src/ui/App.tsx`, `app-context.ts`, `AuthScreen.tsx`, `ConfirmDialog.tsx`:
   session shell and reusable UI behavior.
 - `src/ui/FactoryResetPanel.tsx`: Owner-only warning, reauthentication, exact
@@ -65,8 +69,9 @@ Windows application files changed: **none**.
   shrinking, and R8 rules.
 - `android/app/src/main/AndroidManifest.xml`: offline manifest, camera permission,
   and backup policy.
-- `android/app/src/main/java/com/wholesalepos/offline/MainActivity.java`: native
-  Capacitor activity.
+- `android/app/src/main/java/com/wholesalepos/offline/MainActivity.java` and
+  `LicenseSecureStorePlugin.java`: Capacitor activity and AES-GCM
+  Android-Keystore license verification state.
 - `android/app/src/main/res`: launcher, splash, styles, file provider, and
   data-extraction resources.
 - `ApplicationConfigTest.java`: stable package test.

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">WholesalePOS Offline</string>
-    <string name="title_activity_main">WholesalePOS Offline</string>
+    <string name="app_name">Suki Sync</string>
+    <string name="title_activity_main">Suki Sync</string>
     <string name="package_name">com.wholesalepos.offline</string>
     <string name="custom_url_scheme">com.wholesalepos.offline</string>
 </resources>

@@ -5,7 +5,7 @@ import { effectiveStockThreshold } from "../domain/inventory-alerts";
 import { reportRange } from "../domain/reporting";
 
 const defaults: AppSettings = {
-  businessName: "WholesalePOS Offline",
+  businessName: "Suki Sync Store",
   businessMode: "HYBRID",
   currency: "PHP",
   businessTimezone: "Asia/Manila",

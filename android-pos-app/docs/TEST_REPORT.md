@@ -2,25 +2,26 @@
 
 Verified through 18 July 2026.
 
-Version 0.6.0 includes the secure Owner-only Factory Reset flow. It requires current
-Owner credentials, the exact `FACTORY RESET` phrase, live record-count review,
-and a final destructive confirmation. A verified full backup is enabled by
-default. The database reset is transactional and preserves schema version 7,
-built-in roles, the default warehouse, and all installed app capabilities.
+Version 0.7.0 adds renewable offline Monthly, Yearly, and Lifetime licenses,
+Android-Keystore-backed clock rollback detection, license expiration warnings,
+same-device renewal, and Suki Sync mobile branding. Existing version 1 licenses
+remain valid as lifetime licenses. The update keeps the package identity,
+release certificate, business database, and secure Owner-only Factory Reset.
 
 ## Automated checks
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 19 files, 79 tests passed for offline activation signatures, Device ID
+- Vitest: 19 files, 82 tests passed for version 1 and version 2 offline
+  activation signatures, renewable license terms, Device ID
   stability, factory-reset authorization, confirmation,
   backup failure, rollback, operation concurrency, ordered deletion, schema and
   integrity verification, Installation ID regeneration, cash reconciliation and
   authorization, reporting ranges and totals, finalized
   sale filtering, PDF pagination and sharing, alert transitions, notification
   permissions/deep links, inventory events, migrations, calculations, security,
-  product activity mapping, cashier stock-alert authorization, and legacy
-  WebView compatibility.
+  product activity mapping, cashier stock-alert authorization, ordered license
+  migration, and legacy WebView compatibility.
 - Vite production build targeting Chrome 61-era WebView syntax: passed.
 - Capacitor Android sync: passed.
 - Gradle native unit test: passed.
@@ -60,9 +61,15 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The current release artifact is `WholesalePOS-Offline-0.6.0-release.apk`, version
-code 11. It verifies with APK Signature Scheme v2 and the existing RSA 3072
-WholesalePOS release certificate.
+The current release artifact is `Suki-Sync-0.7.0-release.apk`, version code 12.
+It verifies with APK Signature Scheme v2 and the existing RSA 3072 release
+certificate. Its application label is Suki Sync, minimum API is 28, target API
+is 36, and the manifest contains no `INTERNET` permission.
+
+The companion License Manager 1.1.0 passed strict TypeScript, ESLint, its Vite
+production build, and 10 Vitest tests covering legacy signatures, renewable
+payloads, tamper rejection, duplicate protection, renewal history, replacement,
+vault recovery, and signing-key continuity.
 
 ## Fire OS 7 status
 

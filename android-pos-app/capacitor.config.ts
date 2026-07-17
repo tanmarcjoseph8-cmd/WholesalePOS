@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.wholesalepos.offline",
-  appName: "WholesalePOS Offline",
+  appName: "Suki Sync",
   webDir: "dist",
   server: {
     androidScheme: "https"
@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
       androidIsEncryption: false,
       androidBiometric: {
         biometricAuth: false,
-        biometricTitle: "Unlock WholesalePOS"
+        biometricTitle: "Unlock Suki Sync"
       }
     },
     LocalNotifications: {

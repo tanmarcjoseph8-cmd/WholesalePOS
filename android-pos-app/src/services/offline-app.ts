@@ -33,10 +33,11 @@ async function startupStep(label: string, operation: () => Promise<unknown>, tim
 export class OfflinePosApplication {
   readonly database = database;
   readonly auth = new AuthService(database);
+  readonly license = new LicenseService(database);
   readonly catalog = new CatalogService(database);
   readonly inventory = new InventoryService(database);
   readonly cashDrawer = new CashDrawerService(database);
-  readonly sales = new SalesService(database);
+  readonly sales = new SalesService(database, undefined, () => this.license.requireProtectedOperation());
   readonly restaurant = new RestaurantService(database);
   readonly settingsReports = new SettingsReportService(database);
   readonly inventoryNotifications = inventoryNotificationService;
@@ -45,7 +46,6 @@ export class OfflinePosApplication {
   readonly reportPdf = new ReportPdfService();
   readonly backup = new BackupService(database);
   readonly factoryReset = new FactoryResetService(database, this.auth, this.backup, this.inventoryNotifications);
-  readonly license = new LicenseService(database);
   readonly importExport = new ImportExportService(database, this.settingsReports);
   readonly receiptPrinter = new AndroidPdfReceiptPrinter();
 

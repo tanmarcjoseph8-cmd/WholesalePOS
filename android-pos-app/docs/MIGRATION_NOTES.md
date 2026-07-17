@@ -43,3 +43,11 @@ update does not rewrite users, products, stock, orders, sales, payments,
 settings, or audit records. Existing installations open the activation gate
 once after updating. A successful Owner Factory Reset preserves `license_state`
 while erasing business data and leaves the database at schema version 7.
+
+Version 0.7.0 adds migration 8 with signed license type, expiration, and serial
+number fields. The migration is additive and does not rewrite or delete users,
+products, stock, orders, sales, payments, settings, or audit records. Existing
+version 1 activation codes are interpreted as lifetime licenses. The visible
+app name changes to Suki Sync, but the package ID, signing certificate, database
+identity, Device ID rules, and backup compatibility remain unchanged for safe
+in-place updates.

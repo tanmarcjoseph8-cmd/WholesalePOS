@@ -83,6 +83,12 @@ function exportRows(snapshot = store.snapshot()) {
     "Product Name": license.productName,
     "Product Version": license.productVersion,
     Edition: license.edition,
+    "License Type": license.licenseType,
+    "Issue Date": license.issueDate,
+    "Expiration Date": license.expirationDate ?? "Lifetime",
+    "Days Remaining": license.daysRemaining ?? "Unlimited",
+    "Effective Status": license.displayStatus,
+    "License Serial Number": license.licenseSerialNumber,
     Notes: license.notes,
     "License Status": license.status
   }));
@@ -115,7 +121,9 @@ async function activationSheetHtml(license: LicenseListItem, branding: BrandingS
     <div class="grid"><div class="details">
       <div class="row"><b>Customer</b><span>${escapeHtml(license.customer.customerName)}</span></div><div class="row"><b>Business</b><span>${escapeHtml(license.customer.businessName)}</span></div>
       <div class="row"><b>Product</b><span>${escapeHtml(`${license.productName} ${license.edition}`)}</span></div><div class="row"><b>Device ID</b><span>${escapeHtml(license.deviceId)}</span></div>
-      <div class="row"><b>Activated</b><span>${escapeHtml(new Date(license.activationDate).toLocaleString())}</span></div><div class="row"><b>Status</b><span>${escapeHtml(license.status)}</span></div>
+      <div class="row"><b>License serial</b><span>${escapeHtml(license.licenseSerialNumber)}</span></div><div class="row"><b>License type</b><span>${escapeHtml(license.licenseType)}</span></div>
+      <div class="row"><b>Issue date</b><span>${escapeHtml(new Date(license.issueDate).toLocaleString())}</span></div><div class="row"><b>Expiration</b><span>${escapeHtml(license.expirationDate ? new Date(license.expirationDate).toLocaleString() : "Lifetime")}</span></div>
+      <div class="row"><b>Status</b><span>${escapeHtml(license.displayStatus.replaceAll("_", " "))}</span></div>
       <div class="row"><b>Activation code</b><span class="code">${escapeHtml(license.activationCode)}</span></div>
     </div><div class="qr"><img src="${qrData}" alt="Activation QR code"><p>Scan this QR code on the matching Android tablet.</p></div></div>
     <p class="foot">This certificate is bound to Device ID ${escapeHtml(license.deviceId)}. The activation code is valid only for the signed product and device shown above.</p>
@@ -142,6 +150,7 @@ function registerIpc() {
   register(LICENSE_MANAGER_CHANNELS.touch, async () => undefined);
   register(LICENSE_MANAGER_CHANNELS.snapshot, async () => store.snapshot());
   register(LICENSE_MANAGER_CHANNELS.createLicense, async (input: Parameters<LicenseManagerApi["createLicense"]>[0]) => store.createLicense(input));
+  register(LICENSE_MANAGER_CHANNELS.renewLicense, async (input: Parameters<LicenseManagerApi["renewLicense"]>[0]) => store.renewLicense(input));
   register(LICENSE_MANAGER_CHANNELS.reissueLicense, async (licenseId: string, notes: string) => store.reissueLicense(licenseId, notes));
   register(LICENSE_MANAGER_CHANNELS.replaceDevice, async (input: Parameters<LicenseManagerApi["replaceDevice"]>[0]) => store.replaceDevice(input));
   register(LICENSE_MANAGER_CHANNELS.setLicenseStatus, async (input: Parameters<LicenseManagerApi["setLicenseStatus"]>[0]) => store.setLicenseStatus(input));

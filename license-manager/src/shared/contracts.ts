@@ -1,5 +1,7 @@
 export type LicenseStatus = "ACTIVE" | "REPLACED" | "REVOKED" | "ARCHIVED";
-export type ActivationEventType = "GENERATED" | "REISSUED" | "REPLACED" | "REACTIVATED" | "REVOKED" | "ARCHIVED" | "IMPORTED";
+export type LicenseType = "MONTHLY" | "YEARLY" | "LIFETIME";
+export type LicenseDisplayStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "LIFETIME" | "REPLACED" | "REVOKED" | "ARCHIVED";
+export type ActivationEventType = "GENERATED" | "RENEWED" | "REISSUED" | "REPLACED" | "REACTIVATED" | "REVOKED" | "ARCHIVED" | "IMPORTED";
 
 export type CustomerRecord = {
   id: string;
@@ -34,9 +36,16 @@ export type LicenseRecord = {
   edition: string;
   notes: string;
   status: LicenseStatus;
+  licenseType: LicenseType;
+  issueDate: string;
+  expirationDate: string | null;
+  licenseSerialNumber: string;
   replacementForLicenseId: string | null;
   replacedByLicenseId: string | null;
   replacementDate: string | null;
+  renewalForLicenseId: string | null;
+  renewedByLicenseId: string | null;
+  renewalDate: string | null;
 };
 
 export type ActivationEvent = {
@@ -50,6 +59,9 @@ export type ActivationEvent = {
   activationCode: string;
   softwareVersion: string;
   notes: string;
+  oldExpirationDate: string | null;
+  newExpirationDate: string | null;
+  licenseType: LicenseType;
 };
 
 export type BrandingSettings = {
@@ -63,7 +75,7 @@ export type LicenseManagerPreferences = {
   autoLockMinutes: number;
 };
 
-export type ActivationPayload = {
+export type LegacyActivationPayload = {
   format: "WPOS-LICENSE";
   version: 1;
   licenseId: string;
@@ -74,6 +86,24 @@ export type ActivationPayload = {
   edition: string;
   issuedAt: string;
 };
+
+export type RenewableActivationPayload = {
+  format: "WPOS-LICENSE";
+  version: 2;
+  licenseId: string;
+  licenseSerialNumber: string;
+  customerId: string;
+  deviceId: string;
+  productId: string;
+  productName: string;
+  productVersion: string;
+  edition: string;
+  licenseType: LicenseType;
+  issuedAt: string;
+  expiresAt: string | null;
+};
+
+export type ActivationPayload = LegacyActivationPayload | RenewableActivationPayload;
 
 export type LicenseVaultData = {
   schemaVersion: 1;
@@ -88,7 +118,7 @@ export type LicenseVaultData = {
   preferences: LicenseManagerPreferences;
 };
 
-export type LicenseListItem = LicenseRecord & { customer: CustomerRecord };
+export type LicenseListItem = LicenseRecord & { customer: CustomerRecord; displayStatus: LicenseDisplayStatus; daysRemaining: number | null };
 
 export type ManagerSnapshot = {
   customers: CustomerRecord[];
@@ -111,6 +141,14 @@ export type CreateLicenseInput = {
   productId: string;
   appVersion: string;
   licenseNotes: string;
+  licenseType: LicenseType;
+};
+
+export type RenewLicenseInput = {
+  licenseId: string;
+  deviceId: string;
+  licenseType: LicenseType;
+  administratorNotes: string;
 };
 
 export type CreateLicenseResult =
@@ -128,6 +166,7 @@ export type LicenseManagerApi = {
   touch(): Promise<void>;
   snapshot(): Promise<ManagerSnapshot>;
   createLicense(input: CreateLicenseInput): Promise<CreateLicenseResult>;
+  renewLicense(input: RenewLicenseInput): Promise<LicenseListItem>;
   reissueLicense(licenseId: string, notes: string): Promise<LicenseListItem>;
   replaceDevice(input: { licenseId: string; newDeviceId: string; appVersion: string; notes: string }): Promise<LicenseListItem>;
   setLicenseStatus(input: { licenseId: string; status: Exclude<LicenseStatus, "REPLACED">; notes: string }): Promise<LicenseListItem>;
@@ -153,6 +192,7 @@ export const LICENSE_MANAGER_CHANNELS = {
   touch: "license-manager:touch",
   snapshot: "license-manager:snapshot",
   createLicense: "license-manager:create-license",
+  renewLicense: "license-manager:renew-license",
   reissueLicense: "license-manager:reissue-license",
   replaceDevice: "license-manager:replace-device",
   setLicenseStatus: "license-manager:set-license-status",

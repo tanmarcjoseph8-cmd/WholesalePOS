@@ -1,20 +1,20 @@
 {
-  "generatedAt": "2026-07-17T18:06:32.054Z",
+  "generatedAt": "2026-07-17T19:38:07.392Z",
   "artifacts": [
     {
-      "file": "WholesalePOS-Offline-0.6.0-debug.apk",
-      "bytes": 33602468,
-      "sha256": "f5454bebcc843d07529cf0941a21f773f799bafb76459dd14ea620d222a940a9"
+      "file": "Suki-Sync-0.7.0-debug.apk",
+      "bytes": 33727229,
+      "sha256": "039f0841f9271b81c3773ce2c6619cbc42a04f80a02b77b6929ae1723631e750"
     },
     {
-      "file": "WholesalePOS-Offline-0.6.0-release.apk",
-      "bytes": 23001528,
-      "sha256": "034dbcaa93089ca2ee3d80aa01cc7f43276056b9351d615ce996161c6a930f11"
+      "file": "Suki-Sync-0.7.0-release.apk",
+      "bytes": 23253358,
+      "sha256": "af809c8db6c5127a30aaebdc54783a3749ced6022fb6e9287bd863a94bab40db"
     },
     {
-      "file": "WholesalePOS-Offline-0.6.0-release.aab",
-      "bytes": 11964235,
-      "sha256": "a3ca0c6b04017dcc666ba51058f6bba84f2d104308b7388866c6ed78e1d29ea0"
+      "file": "Suki-Sync-0.7.0-release.aab",
+      "bytes": 12221655,
+      "sha256": "7bb48fa26d9e59ebb9315bdac68011ac6a24bce2da72ded5f74e633017b9b22f"
     }
   ]
 }

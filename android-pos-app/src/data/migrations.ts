@@ -504,6 +504,15 @@ CREATE TABLE IF NOT EXISTS license_state (
   updated_at TEXT NOT NULL
 );
 `
+  },
+  {
+    version: 8,
+    name: "renewable_offline_licensing",
+    sql: `
+ALTER TABLE license_state ADD COLUMN license_type TEXT NOT NULL DEFAULT 'LIFETIME' CHECK(license_type IN ('MONTHLY','YEARLY','LIFETIME'));
+ALTER TABLE license_state ADD COLUMN expiration_at TEXT;
+ALTER TABLE license_state ADD COLUMN license_serial_number TEXT;
+`
   }
 ];
 

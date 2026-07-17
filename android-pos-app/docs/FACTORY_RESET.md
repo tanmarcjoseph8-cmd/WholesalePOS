@@ -44,7 +44,7 @@ creation statements.
 The app package, release signature, schema migrations, SQLite table definitions,
 built-in roles, default warehouse, screen code, reporting, POS, restaurant,
 printing, imports, and backup/restore features remain installed. The database
-stays at schema version 7. The signed `license_state` record is preserved, while
+stays at schema version 8. The signed `license_state` record is preserved, while
 a new local Installation ID is generated after every successful reset.
 
 Factory Reset returns to first-owner setup without asking for activation again.
@@ -95,7 +95,7 @@ commit.
 
 ## Verification
 
-Version 0.6.0 passed ESLint, strict TypeScript, 79 Vitest tests in 19 files, the
+Version 0.7.0 passed ESLint, strict TypeScript, 82 Vitest tests in 19 files, the
 Vite production build, Gradle native tests, debug/release APK builds, and release
 signature verification. The Android 10 emulator completed the full guarded reset
 with a verified persistent backup. The post-reset database reported schema 7,
@@ -121,9 +121,9 @@ ID regeneration, and credential redaction.
 
 ## Installable artifacts
 
-- Debug APK: `apk/WholesalePOS-Offline-0.6.0-debug.apk`
-- Signed release APK: `apk/WholesalePOS-Offline-0.6.0-release.apk`
-- Signed release bundle: `apk/WholesalePOS-Offline-0.6.0-release.aab`
+- Debug APK: `apk/Suki-Sync-0.7.0-debug.apk`
+- Signed release APK: `apk/Suki-Sync-0.7.0-release.apk`
+- Signed release bundle: `apk/Suki-Sync-0.7.0-release.aab`
 - SHA-256 manifest: `apk/checksums.json`
 
 The complete created/modified file inventory is maintained in

@@ -4,9 +4,9 @@ import { basename, resolve } from "node:path";
 
 const { version } = JSON.parse(await readFile(resolve("package.json"), "utf8"));
 const candidates = [
-  ["android/app/build/outputs/apk/debug/app-debug.apk", `WholesalePOS-Offline-${version}-debug.apk`],
-  ["android/app/build/outputs/apk/release/app-release.apk", `WholesalePOS-Offline-${version}-release.apk`],
-  ["android/app/build/outputs/bundle/release/app-release.aab", `WholesalePOS-Offline-${version}-release.aab`]
+  ["android/app/build/outputs/apk/debug/app-debug.apk", `Suki-Sync-${version}-debug.apk`],
+  ["android/app/build/outputs/apk/release/app-release.apk", `Suki-Sync-${version}-release.apk`],
+  ["android/app/build/outputs/bundle/release/app-release.aab", `Suki-Sync-${version}-release.aab`]
 ];
 
 const output = resolve("apk");

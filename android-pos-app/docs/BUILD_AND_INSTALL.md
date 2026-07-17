@@ -4,10 +4,10 @@
 
 The release build supports Android 9 (API 28), Fire OS 7, and later versions.
 
-1. Copy `apk/WholesalePOS-Offline-0.6.0-release.apk` to the tablet.
+1. Copy `apk/Suki-Sync-0.7.0-release.apk` to the tablet.
 2. Open the APK from Files.
 3. If Android blocks it, allow **Install unknown apps** for the Files application, then retry.
-4. Open **WholesalePOS Offline**, copy its Device ID, and generate a license in
+4. Open **Suki Sync**, copy its Device ID, and generate a license in
    the private Windows License Manager.
 5. Enter the activation code or scan its QR code, then create the first Owner.
 6. Create a full backup before relying on the tablet for live transactions.
@@ -19,13 +19,13 @@ the app or clear its storage**, because either action deletes the local database
 With Android platform tools installed:
 
 ```powershell
-adb install -r .\apk\WholesalePOS-Offline-0.6.0-release.apk
+adb install -r .\apk\Suki-Sync-0.7.0-release.apk
 ```
 
 Compare the APK with `apk/checksums.json`:
 
 ```powershell
-Get-FileHash .\apk\WholesalePOS-Offline-0.6.0-release.apk -Algorithm SHA256
+Get-FileHash .\apk\Suki-Sync-0.7.0-release.apk -Algorithm SHA256
 ```
 
 ## Development prerequisites
@@ -70,6 +70,9 @@ node .\scripts\collect-apk.mjs
 Back up both `wholesalepos-release.jks` and its secret environment file in a
 secure offline location. Losing either prevents trusted in-place updates. Never
 commit signing material.
+
+The internal keystore filename and package ID retain their established names so
+0.7.0 can update earlier installations without losing local business data.
 
 Before each release, increment `versionCode` and update `versionName` in
 `android/app/build.gradle`, rebuild, verify the signature, and test
