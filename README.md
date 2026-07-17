@@ -86,3 +86,12 @@ Smoke-test the packaged Windows app:
 ```bash
 pnpm desktop:smoke:win
 ```
+
+## Offline Android Licensing
+
+The independent Android edition now uses signed, device-bound offline
+activation. The private Windows License Manager stores its customer database and
+P-256 signing authority in a password-encrypted vault; Android contains only the
+public verification key. See [License Manager](license-manager/README.md) and
+[Android activation](android-pos-app/docs/LICENSE_ACTIVATION.md) for the owner
+workflow, backup requirements, and offline revocation limitation.

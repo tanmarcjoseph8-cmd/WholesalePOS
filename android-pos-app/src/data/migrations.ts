@@ -485,6 +485,25 @@ CREATE TABLE IF NOT EXISTS device_state (
   updated_at TEXT NOT NULL
 );
 `
+  },
+  {
+    version: 7,
+    name: "offline_product_activation",
+    sql: `
+CREATE TABLE IF NOT EXISTS license_state (
+  id TEXT PRIMARY KEY NOT NULL CHECK(id='primary'),
+  device_id TEXT NOT NULL,
+  activation_code TEXT NOT NULL,
+  license_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  product_version TEXT NOT NULL,
+  edition TEXT NOT NULL,
+  issued_at TEXT NOT NULL,
+  activated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
   }
 ];
 

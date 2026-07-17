@@ -19,6 +19,10 @@
     "desktop:installer:win": "pnpm --filter @wholesalepos/desktop installer:win",
     "desktop:package:win": "pnpm --filter @wholesalepos/desktop package:win",
     "desktop:smoke:win": "node scripts/smoke-packaged-desktop.mjs",
+    "license-manager:dev": "pnpm --filter @wholesalepos/license-manager dev",
+    "license-manager:build": "pnpm --filter @wholesalepos/license-manager build",
+    "license-manager:installer:win": "pnpm --filter @wholesalepos/license-manager installer:win",
+    "license-manager:provision": "pnpm --filter @wholesalepos/license-manager provision",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {

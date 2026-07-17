@@ -2,6 +2,10 @@
 
 ## First start
 
+The first screen displays this tablet's Device ID. Ask the software owner for a
+matching offline license, then enter its activation code or scan its QR code.
+Activation does not require internet. See [Offline License Activation](LICENSE_ACTIVATION.md).
+
 Create the owner name, business name, login, and a PIN or password of at least
 four characters. Credentials are local to this tablet. The owner can add manager
 and cashier accounts under **Settings**.

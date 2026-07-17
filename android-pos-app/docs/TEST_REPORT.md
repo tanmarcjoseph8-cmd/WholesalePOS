@@ -1,18 +1,19 @@
 # Verification Report
 
-Verified through 17 July 2026.
+Verified through 18 July 2026.
 
-Version 0.5.0 adds the secure Owner-only Factory Reset flow. It requires current
+Version 0.6.0 includes the secure Owner-only Factory Reset flow. It requires current
 Owner credentials, the exact `FACTORY RESET` phrase, live record-count review,
 and a final destructive confirmation. A verified full backup is enabled by
-default. The database reset is transactional and preserves schema version 6,
+default. The database reset is transactional and preserves schema version 7,
 built-in roles, the default warehouse, and all installed app capabilities.
 
 ## Automated checks
 
 - ESLint: passed.
 - Strict TypeScript project build: passed with no errors.
-- Vitest: 17 files, 74 tests passed for factory-reset authorization, confirmation,
+- Vitest: 19 files, 79 tests passed for offline activation signatures, Device ID
+  stability, factory-reset authorization, confirmation,
   backup failure, rollback, operation concurrency, ordered deletion, schema and
   integrity verification, Installation ID regeneration, cash reconciliation and
   authorization, reporting ranges and totals, finalized
@@ -25,13 +26,13 @@ built-in roles, the default warehouse, and all installed app capabilities.
 - Gradle native unit test: passed.
 - Android 10 instrumentation test confirming no internet permission: passed.
 - Gradle debug APK, signed release APK, and signed release AAB: passed.
-- Version 0.5.0 installed on the Android 10 emulator; migration 6 completed and
+- Version 0.6.0 installed on the Android 10 emulator; migration 7 completed and
   the complete Owner reset flow created a verified 25,642-byte persistent backup.
-- Post-reset SQLite inspection found schema version 6, `integrity_check = ok`, no
+- Post-reset SQLite inspection found schema version 7, `integrity_check = ok`, no
   foreign-key violations, zero records in all 24 business tables, three built-in
   roles, one default warehouse, reset sequences, and a new Installation ID.
-- The reset success screen reloaded to the genuine first-owner setup screen with
-  no fatal JavaScript, native, or SQLite error.
+- The reset service preserves the signed license record and reloads to genuine
+  first-owner setup with no fatal JavaScript, native, or SQLite error.
 - Release APK signature: APK Signature Scheme v2, RSA 3072.
 - Manifest: minimum API 28, target API 36, no `INTERNET` permission.
 - Every packaged Capacitor plugin declares support for API 24 or newer.
@@ -59,8 +60,8 @@ The emulator found and drove the fix for Android 10 WebView support:
 Version 0.2.0 retains compatibility implementations for `replaceAll` and
 `Object.fromEntries` before the React application starts on older WebViews.
 
-The current release artifact is `WholesalePOS-Offline-0.5.0-release.apk`, version
-code 10. It verifies with APK Signature Scheme v2 and the existing RSA 3072
+The current release artifact is `WholesalePOS-Offline-0.6.0-release.apk`, version
+code 11. It verifies with APK Signature Scheme v2 and the existing RSA 3072
 WholesalePOS release certificate.
 
 ## Fire OS 7 status

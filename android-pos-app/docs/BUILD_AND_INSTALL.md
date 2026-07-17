@@ -4,11 +4,13 @@
 
 The release build supports Android 9 (API 28), Fire OS 7, and later versions.
 
-1. Copy `apk/WholesalePOS-Offline-0.5.0-release.apk` to the tablet.
+1. Copy `apk/WholesalePOS-Offline-0.6.0-release.apk` to the tablet.
 2. Open the APK from Files.
 3. If Android blocks it, allow **Install unknown apps** for the Files application, then retry.
-4. Open **WholesalePOS Offline** and create the first owner account.
-5. Create a full backup before relying on the tablet for live transactions.
+4. Open **WholesalePOS Offline**, copy its Device ID, and generate a license in
+   the private Windows License Manager.
+5. Enter the activation code or scan its QR code, then create the first Owner.
+6. Create a full backup before relying on the tablet for live transactions.
 
 For an update, install the newer APK over the existing app. Keep the package ID
 `com.wholesalepos.offline` and sign with the same release key. **Do not uninstall
@@ -17,13 +19,13 @@ the app or clear its storage**, because either action deletes the local database
 With Android platform tools installed:
 
 ```powershell
-adb install -r .\apk\WholesalePOS-Offline-0.5.0-release.apk
+adb install -r .\apk\WholesalePOS-Offline-0.6.0-release.apk
 ```
 
 Compare the APK with `apk/checksums.json`:
 
 ```powershell
-Get-FileHash .\apk\WholesalePOS-Offline-0.5.0-release.apk -Algorithm SHA256
+Get-FileHash .\apk\WholesalePOS-Offline-0.6.0-release.apk -Algorithm SHA256
 ```
 
 ## Development prerequisites

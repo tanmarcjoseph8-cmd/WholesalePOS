@@ -22,8 +22,8 @@ const inventoryCandidatesSql = `WITH stock AS (
   WHERE p.status='ACTIVE' AND p.deleted_at IS NULL AND w.deleted_at IS NULL
 ), candidates AS (
   SELECT stock.*, state.current_status AS previous_status,
-    CASE WHEN quantity_micro<=0 THEN 'OUT_OF_STOCK'
-      WHEN quantity_micro<=threshold_micro THEN 'LOW_STOCK' ELSE 'NORMAL' END AS next_status
+    CASE WHEN stock.quantity_micro<=0 THEN 'OUT_OF_STOCK'
+      WHEN stock.quantity_micro<=stock.threshold_micro THEN 'LOW_STOCK' ELSE 'NORMAL' END AS next_status
   FROM stock LEFT JOIN inventory_alert_state state
     ON state.product_id=stock.product_id AND state.warehouse_id=stock.warehouse_id
 )`;

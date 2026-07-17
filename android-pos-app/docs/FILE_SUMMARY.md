@@ -33,6 +33,12 @@ Windows application files changed: **none**.
 - `src/services/factory-reset-service.ts` and its tests: Owner-only guarded reset,
   persistent pre-reset backup, dependency-ordered transactional deletion,
   Installation ID regeneration, and post-delete database verification.
+- `src/domain/license-code.ts`, `license-public-key.ts`, and tests: canonical
+  activation payload parsing and P-256 offline signature verification.
+- `src/platform/device-identity.ts` and tests: stable, non-secret license Device
+  ID derived from Android's app-scoped identifier.
+- `src/services/license-service.ts`: device-bound activation persistence and
+  startup status verification isolated from business services.
 - `src/services/operation-coordinator.ts`: mutual exclusion for checkout and
   factory reset.
 - `src/services/backup-service.test.ts`: persistent reset-backup metadata and
@@ -45,6 +51,8 @@ Windows application files changed: **none**.
   session shell and reusable UI behavior.
 - `src/ui/FactoryResetPanel.tsx`: Owner-only warning, reauthentication, exact
   phrase, final counts, progress, and success flow.
+- `src/ui/ActivationScreen.tsx`, `AboutLicensePanel.tsx`: manual/QR activation
+  gate and non-secret license details.
 - `src/ui/views` TSX files: dashboard, POS, cash drawer, inventory/import,
   restaurant, sales, reports, users, settings, backups, and exports.
 - `src/main.tsx`, `src/styles.css`: application bootstrap and responsive styling.
@@ -55,7 +63,8 @@ Windows application files changed: **none**.
   `variables.gradle`: Gradle wrapper and API 28/36 configuration.
 - `android/app/build.gradle`, `proguard-rules.pro`: application, release signing,
   shrinking, and R8 rules.
-- `android/app/src/main/AndroidManifest.xml`: offline manifest and backup policy.
+- `android/app/src/main/AndroidManifest.xml`: offline manifest, camera permission,
+  and backup policy.
 - `android/app/src/main/java/com/wholesalepos/offline/MainActivity.java`: native
   Capacitor activity.
 - `android/app/src/main/res`: launcher, splash, styles, file provider, and
@@ -73,5 +82,7 @@ Windows application files changed: **none**.
   operation, recovery, import, migration, constraints, and evidence.
 - `docs/FACTORY_RESET.md`: complete reset behavior, preserved/erased data,
   backup location, database method, failures, verification, and artifact paths.
+- `docs/LICENSE_ACTIVATION.md`: offline activation, device binding, reissue, and
+  reset/reinstall behavior.
 - `docs/factory-reset/*.png`: warning, Owner reauthentication, typed phrase,
   final confirmation, progress, success, and fresh-setup emulator screenshots.

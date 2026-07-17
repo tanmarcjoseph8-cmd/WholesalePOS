@@ -2,6 +2,7 @@ packages:
   - frontend
   - backend
   - desktop
+  - license-manager
   - tests
 allowBuilds:
   '@prisma/client': true

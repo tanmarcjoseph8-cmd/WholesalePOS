@@ -44,13 +44,12 @@ creation statements.
 The app package, release signature, schema migrations, SQLite table definitions,
 built-in roles, default warehouse, screen code, reporting, POS, restaurant,
 printing, imports, and backup/restore features remain installed. The database
-stays at schema version 6. A new local Installation ID is generated after every
-successful reset.
+stays at schema version 7. The signed `license_state` record is preserved, while
+a new local Installation ID is generated after every successful reset.
 
-This Android edition currently has no activation, subscription, licensing, or
-tutorial subsystem. Factory Reset therefore returns to the actual first-owner
-setup screen; it does not display an activation screen. App uninstall, Android
-storage clearing, or a tablet factory reset are separate operations.
+Factory Reset returns to first-owner setup without asking for activation again.
+App uninstall, Android storage clearing, or a tablet factory reset are separate
+operations and remove the local activation record.
 
 ## Backup
 
@@ -90,15 +89,16 @@ The reset implementation is in `src/services/factory-reset-service.ts`.
 Financial child records are deleted before sales and cash sessions; reservation
 and order children before orders and tables; alert/import/movement/stock/barcode
 records before products and categories; then settings, audit logs, and users.
-`device_state` is recreated with a new Installation ID. All 24 business tables
-must report zero records before commit.
+`device_state` is recreated with a new Installation ID. `license_state` is not
+part of the deletion set. All 24 business tables must report zero records before
+commit.
 
 ## Verification
 
-Version 0.5.0 passed ESLint, strict TypeScript, 74 Vitest tests in 17 files, the
+Version 0.6.0 passed ESLint, strict TypeScript, 79 Vitest tests in 19 files, the
 Vite production build, Gradle native tests, debug/release APK builds, and release
 signature verification. The Android 10 emulator completed the full guarded reset
-with a verified persistent backup. The post-reset database reported schema 6,
+with a verified persistent backup. The post-reset database reported schema 7,
 `PRAGMA integrity_check = ok`, no foreign-key issues, zero records in all 24
 business tables, three built-in roles, one default warehouse, reset sequences,
 and a newly generated Installation ID.
@@ -121,9 +121,9 @@ ID regeneration, and credential redaction.
 
 ## Installable artifacts
 
-- Debug APK: `apk/WholesalePOS-Offline-0.5.0-debug.apk`
-- Signed release APK: `apk/WholesalePOS-Offline-0.5.0-release.apk`
-- Signed release bundle: `apk/WholesalePOS-Offline-0.5.0-release.aab`
+- Debug APK: `apk/WholesalePOS-Offline-0.6.0-debug.apk`
+- Signed release APK: `apk/WholesalePOS-Offline-0.6.0-release.apk`
+- Signed release bundle: `apk/WholesalePOS-Offline-0.6.0-release.aab`
 - SHA-256 manifest: `apk/checksums.json`
 
 The complete created/modified file inventory is maintained in

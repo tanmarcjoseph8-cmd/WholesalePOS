@@ -4,6 +4,7 @@ import { QUANTITY_SCALE, type AppSettings, type LocalUser } from "../../domain/m
 import { useOfflineApp } from "../app-context";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { FactoryResetPanel } from "../FactoryResetPanel";
+import { AboutLicensePanel } from "../AboutLicensePanel";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -100,6 +101,7 @@ export function SettingsView() {
           {canManage ? <form className="form-stack compact" onSubmit={createUser}><h4>Add user</h4><label>Name<input value={newUser.name} onChange={(event) => setNewUser({ ...newUser, name: event.target.value })} required /></label><label>Login<input value={newUser.login} onChange={(event) => setNewUser({ ...newUser, login: event.target.value })} autoCapitalize="none" required /></label><label>PIN or password<input type="password" minLength={4} value={newUser.secret} onChange={(event) => setNewUser({ ...newUser, secret: event.target.value })} required /></label><label>Role<select value={newUser.role} onChange={(event) => setNewUser({ ...newUser, role: event.target.value as typeof newUser.role })}><option value="CASHIER">Cashier</option><option value="MANAGER">Manager</option></select></label><button className="button secondary" disabled={busy}><UserPlus size={18} /> Add user</button></form> : null}
         </section>
       </div>
+      <AboutLicensePanel />
       <FactoryResetPanel />
       <ConfirmDialog open={restoreOpen} title="Replace all local data?" confirmLabel={busy ? "Restoring" : "Restore backup"} destructive disabled={busy || restoreText !== "RESTORE"} onClose={() => setRestoreOpen(false)} onConfirm={() => void restore()}><p>A safety backup will be offered first. The selected backup then replaces this tablet&apos;s products, stock, sales, orders, users, and settings.</p><label>Type RESTORE<input value={restoreText} onChange={(event) => setRestoreText(event.target.value)} autoCapitalize="characters" /></label></ConfirmDialog>
     </section>

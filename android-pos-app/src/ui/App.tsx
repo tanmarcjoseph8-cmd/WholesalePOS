@@ -8,6 +8,8 @@ import { offlineApp } from "../services/offline-app";
 import { AppContext } from "./app-context";
 import { AuthScreen } from "./AuthScreen";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ActivationScreen } from "./ActivationScreen";
+import type { MobileLicenseStatus } from "../services/license-service";
 
 const DashboardView = lazy(() => import("./views/DashboardView").then((module) => ({ default: module.DashboardView })));
 const InventoryView = lazy(() => import("./views/InventoryView").then((module) => ({ default: module.InventoryView })));
@@ -38,6 +40,7 @@ export function App() {
   const [bootState, setBootState] = useState<"booting" | "ready" | "error">("booting");
   const [bootError, setBootError] = useState("");
   const [requiresSetup, setRequiresSetup] = useState(false);
+  const [licenseStatus, setLicenseStatus] = useState<MobileLicenseStatus | null>(null);
   const [user, setUser] = useState<LocalUser | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [view, setView] = useState<ViewId>("dashboard");
@@ -53,9 +56,9 @@ export function App() {
   useEffect(() => {
     let active = true;
     void offlineApp.initialize().then(async () => {
-      const [setup, loadedSettings] = await Promise.all([offlineApp.auth.requiresSetup(), offlineApp.settingsReports.getSettings()]);
+      const [setup, loadedSettings, loadedLicense] = await Promise.all([offlineApp.auth.requiresSetup(), offlineApp.settingsReports.getSettings(), offlineApp.license.getStatus()]);
       if (!active) return;
-      setRequiresSetup(setup); setSettings(loadedSettings); document.documentElement.dataset.theme = loadedSettings.darkMode ? "dark" : "light"; setBootState("ready");
+      setRequiresSetup(setup); setSettings(loadedSettings); setLicenseStatus(loadedLicense); document.documentElement.dataset.theme = loadedSettings.darkMode ? "dark" : "light"; setBootState("ready");
     }).catch((error: unknown) => { if (active) { setBootError(error instanceof Error ? error.message : "The local database could not start."); setBootState("error"); } });
     return () => { active = false; };
   }, []);
@@ -127,6 +130,8 @@ export function App() {
 
   if (bootState === "booting") return <main className="boot-page"><RefreshCw className="spin" size={32} /><strong>Opening secure local database</strong></main>;
   if (bootState === "error") return <main className="boot-page error"><DatabaseError /><h1>WholesalePOS could not start</h1><p>{bootError}</p><button className="button primary" onClick={() => window.location.reload()}>Try again</button></main>;
+  if (!licenseStatus) return <main className="boot-page"><RefreshCw className="spin" size={32} /><strong>Checking offline activation</strong></main>;
+  if (licenseStatus.state !== "ACTIVE") return <ActivationScreen app={offlineApp} status={licenseStatus} onActivated={setLicenseStatus} />;
   if (!user) return <AuthScreen app={offlineApp} requiresSetup={requiresSetup} onAuthenticated={(authenticated) => { setUser(authenticated); setRequiresSetup(false); void offlineApp.inventoryAlerts.reconcileAndNotify(); }} />;
 
   const allowedViews = views.filter((entry) => {

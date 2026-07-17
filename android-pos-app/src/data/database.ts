@@ -8,8 +8,9 @@ export type InventoryChangeListener = () => Promise<unknown> | unknown;
 
 export function isInventoryMutationSql(sql: string) {
   const normalized = sql.trim().toLowerCase();
-  if (!/^(insert|update|delete|replace)\b/.test(normalized)) return false;
-  return /\b(inventory_stock|inventory_reservations|products|settings)\b/.test(normalized);
+  const mutation = normalized.match(/^(?:insert(?:\s+or\s+\w+)?\s+into|replace(?:\s+into)?|update(?:\s+or\s+\w+)?|delete\s+from)\s+([a-z_][a-z0-9_]*)\b/);
+  const table = mutation?.[1];
+  return table ? new Set(["inventory_stock", "inventory_reservations", "products", "settings"]).has(table) : false;
 }
 
 export class LocalDatabase {

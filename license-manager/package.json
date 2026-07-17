@@ -1,0 +1,65 @@
+{
+  "name": "@wholesalepos/license-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private offline license authority for WholesalePOS products.",
+  "author": "WholesalePOS",
+  "type": "module",
+  "main": "dist-electron/main/main.js",
+  "scripts": {
+    "dev": "pnpm build && electron .",
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json --noEmit && vite build",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit --pretty false && tsc -p tsconfig.renderer.json --noEmit --pretty false",
+    "test": "vitest run",
+    "lint": "eslint src scripts vite.config.ts",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "provision": "node scripts/provision-authority.mjs",
+    "authority:verify": "node scripts/verify-authority.mjs",
+    "installer:win": "pnpm build && electron-builder --win nsis --x64",
+    "package:win": "pnpm build && electron-builder --win zip --x64"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.wholesalepos.licensemanager",
+    "productName": "WholesalePOS License Manager",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "WholesalePOS License Manager"
+    }
+  }
+}

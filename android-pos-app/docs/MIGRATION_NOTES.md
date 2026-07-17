@@ -37,3 +37,9 @@ Installation ID. Existing users, products, stock, orders, sales, payments,
 settings, and audit records remain unchanged during the update. A successful
 Owner Factory Reset regenerates this ID while preserving migration history,
 schema version 6, built-in roles, and the default warehouse.
+
+Version 0.6.0 adds migration 7 with the singleton `license_state` table. The
+update does not rewrite users, products, stock, orders, sales, payments,
+settings, or audit records. Existing installations open the activation gate
+once after updating. A successful Owner Factory Reset preserves `license_state`
+while erasing business data and leaves the database at schema version 7.

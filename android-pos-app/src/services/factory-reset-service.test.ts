@@ -142,6 +142,7 @@ describe("FactoryResetService", () => {
     expect(sql).not.toContain("delete from schema_migrations");
     expect(sql).not.toContain("delete from roles");
     expect(sql).not.toContain("delete from warehouses");
+    expect(sql).not.toContain("delete from license_state");
   });
 
   it("resets receipt numbers and generates a new Installation ID", async () => {

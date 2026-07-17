@@ -15,5 +15,6 @@ describe("live inventory change detection", () => {
     expect(isInventoryMutationSql("SELECT * FROM inventory_stock")).toBe(false);
     expect(isInventoryMutationSql("INSERT INTO audit_logs(id) VALUES (?)")).toBe(false);
     expect(isInventoryMutationSql("UPDATE sales SET status='VOIDED'")).toBe(false);
+    expect(isInventoryMutationSql("UPDATE inventory_alerts SET resolved_at=? WHERE EXISTS (SELECT 1 FROM products)")).toBe(false);
   });
 });
