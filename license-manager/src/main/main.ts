@@ -190,7 +190,7 @@ function registerIpc() {
 }
 
 async function createWindow() {
-  mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1050, minHeight: 680, backgroundColor: "#f5f7fa", show: false, webPreferences: { preload: join(dirname(fileURLToPath(import.meta.url)), "../preload/preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  mainWindow = new BrowserWindow({ width: 1440, height: 900, minWidth: 1050, minHeight: 680, backgroundColor: "#f5f7fa", show: false, webPreferences: { preload: join(dirname(fileURLToPath(import.meta.url)), "../preload/preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   mainWindow.removeMenu();
   mainWindow.once("ready-to-show", () => mainWindow?.show());
   await mainWindow.loadFile(join(app.getAppPath(), "dist", "index.html"));
