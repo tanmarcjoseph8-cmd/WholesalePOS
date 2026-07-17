@@ -15,6 +15,8 @@ import { SalesService } from "./sales-service";
 import { SettingsReportService } from "./settings-report-service";
 import { FactoryResetService } from "./factory-reset-service";
 import { LicenseService } from "./license-service";
+import { ProductImageService } from "./product-image-service";
+import { PricingService } from "./pricing-service";
 
 async function startupStep(label: string, operation: () => Promise<unknown>, timeoutMs = 20_000) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -35,6 +37,8 @@ export class OfflinePosApplication {
   readonly auth = new AuthService(database);
   readonly license = new LicenseService(database);
   readonly catalog = new CatalogService(database);
+  readonly productImages = new ProductImageService(database);
+  readonly pricing = new PricingService(database);
   readonly inventory = new InventoryService(database);
   readonly cashDrawer = new CashDrawerService(database);
   readonly sales = new SalesService(database, undefined, () => this.license.requireProtectedOperation());

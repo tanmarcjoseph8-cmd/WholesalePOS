@@ -14,6 +14,7 @@ export function SettingsView() {
   const [users, setUsers] = useState<LocalUser[]>([]);
   const [schemaVersion, setSchemaVersion] = useState(0);
   const [integrity, setIntegrity] = useState<boolean | null>(null);
+  const [databaseHealth, setDatabaseHealth] = useState<{ healthy: boolean; bytes: number; pageCount: number; freePageCount: number } | null>(null);
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today());
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -23,9 +24,10 @@ export function SettingsView() {
   const [newUser, setNewUser] = useState({ name: "", login: "", secret: "", role: "CASHIER" as "CASHIER" | "MANAGER" });
 
   useEffect(() => {
-    void Promise.all([app.settingsReports.getSettings(), app.auth.listUsers(), app.database.schemaVersion(), app.database.integrityCheck(), app.inventoryNotifications.permissionStatus()]).then(([nextSettings, nextUsers, version, healthy, permission]) => {
+    void Promise.all([app.settingsReports.getSettings(), app.auth.listUsers(), app.database.schemaVersion(), app.database.integrityCheck(), app.inventoryNotifications.permissionStatus(), app.database.healthSnapshot()]).then(([nextSettings, nextUsers, version, healthy, permission, health]) => {
       setSettings(nextSettings); setUsers(nextUsers); setSchemaVersion(version); setIntegrity(healthy);
       setNotificationPermission(permission);
+      setDatabaseHealth(health);
     });
   }, [app]);
 
@@ -61,6 +63,17 @@ export function SettingsView() {
     }, "Backup restored.");
   }
 
+  async function optimizeDatabase() {
+    setBusy(true);
+    try {
+      const health = await app.database.optimize();
+      setDatabaseHealth(health);
+      setIntegrity(health.healthy);
+      notify("Database planner statistics refreshed.", "success");
+    } catch (error) { notify(error instanceof Error ? error.message : "Database maintenance failed.", "error"); }
+    finally { setBusy(false); }
+  }
+
   if (!settings) return <p className="loading">Loading settings...</p>;
   const canManage = user.permissions.includes("*") || user.permissions.includes("settings.manage");
 
@@ -94,7 +107,8 @@ export function SettingsView() {
           <button className="button secondary" disabled={busy || from > to} onClick={() => void run(() => app.importExport.exportSales(from, to), "Sales CSV created.")}><FileDown size={18} /> Export sales CSV</button>
           <button className="button secondary" disabled={busy} onClick={() => void run(() => app.importExport.exportProducts(), "Products CSV created.")}><FileDown size={18} /> Export products CSV</button>
           <button className="button secondary" disabled={busy} onClick={() => void run(() => app.importExport.exportInventory(), "Inventory CSV created.")}><FileDown size={18} /> Export inventory CSV</button>
-          <div className={`health-status ${integrity ? "healthy" : "unhealthy"}`}><Database size={19} /><div><strong>{integrity ? "Database healthy" : "Database check failed"}</strong><span>Schema version {schemaVersion}</span></div></div>
+          <div className={`health-status ${integrity ? "healthy" : "unhealthy"}`}><Database size={19} /><div><strong>{integrity ? "Database healthy" : "Database check failed"}</strong><span>Schema version {schemaVersion}{databaseHealth ? ` · ${(databaseHealth.bytes / 1_048_576).toFixed(1)} MB · ${databaseHealth.freePageCount.toLocaleString()} free pages` : ""}</span></div></div>
+          <button className="button secondary" disabled={!canManage || busy} onClick={() => void optimizeDatabase()}><Database size={18} /> Optimize database</button>
         </section>
 
         <section className="data-panel user-panel"><h3><ShieldCheck size={19} /> Local users</h3><div className="user-list">{users.map((entry) => <article key={entry.id}><div><strong>{entry.name}</strong><span>@{entry.login}</span></div><b>{entry.role}</b></article>)}</div>

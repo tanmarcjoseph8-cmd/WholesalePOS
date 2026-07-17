@@ -1,7 +1,7 @@
 import type { LocalDatabase } from "../data/database";
 import { createId, inventoryUnits, nowIso, QUANTITY_SCALE, type LocalUser, type UnitCode } from "../domain/models";
 import { fileService, type FileService } from "../platform/file-service";
-import { audit } from "./service-helpers";
+import { audit, placeholders } from "./service-helpers";
 import type { SettingsReportService } from "./settings-report-service";
 
 export type ImportRow = {
@@ -26,6 +26,8 @@ export type ImportPreview = {
   validCount: number;
   invalidCount: number;
 };
+
+export type ImportProgress = { processed: number; total: number; created: number; updated: number; skipped: number };
 
 function text(value: unknown) {
   return String(value ?? "").trim();
@@ -62,7 +64,7 @@ export class ImportExportService {
     const sheet = workbook.Sheets[workbook.SheetNames[0] ?? ""];
     if (!sheet) throw new Error("The selected workbook has no readable worksheet.");
     const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-    if (rawRows.length > 5_000) throw new Error("Import files are limited to 5,000 rows per batch on a tablet.");
+    if (rawRows.length > 100_000) throw new Error("Import files are limited to 100,000 product rows per batch.");
     const rows = rawRows.map((raw, index): ImportRow => {
       const source = normalizeHeaders(raw);
       const name = text(source.name ?? source.product_name);
@@ -95,77 +97,82 @@ export class ImportExportService {
         errors
       };
     });
+    const seenSku = new Map<string, number>();
+    const seenBarcode = new Map<string, number>();
+    for (const row of rows) {
+      const skuKey = row.sku.toLocaleLowerCase();
+      const barcodeKey = row.barcode?.toLocaleLowerCase() ?? "";
+      if (skuKey && seenSku.has(skuKey)) row.errors.push(`Duplicate SKU also appears on row ${seenSku.get(skuKey)}.`);
+      else if (skuKey) seenSku.set(skuKey, row.rowNumber);
+      if (barcodeKey && seenBarcode.has(barcodeKey)) row.errors.push(`Duplicate barcode also appears on row ${seenBarcode.get(barcodeKey)}.`);
+      else if (barcodeKey) seenBarcode.set(barcodeKey, row.rowNumber);
+    }
     return { sourceName: file.name, fingerprint: await fingerprint(file.bytes), rows, validCount: rows.filter((row) => !row.errors.length).length, invalidCount: rows.filter((row) => row.errors.length).length } satisfies ImportPreview;
   }
 
-  async executeProductImport(actor: LocalUser, preview: ImportPreview, duplicateAction: "SKIP" | "UPDATE") {
+  /** Imports a prevalidated catalog in native batches while preserving all-or-nothing product and stock writes. */
+  async executeProductImport(actor: LocalUser, preview: ImportPreview, duplicateAction: "SKIP" | "UPDATE", options: { onProgress?: (progress: ImportProgress) => void; signal?: AbortSignal } = {}) {
     if (preview.invalidCount) throw new Error("Correct or remove invalid rows before importing.");
+    if (preview.rows.length > 100_000) throw new Error("Imports cannot exceed 100,000 product rows.");
     const previous = await this.db.query<{ id: string }>("SELECT id FROM import_batches WHERE source_fingerprint=? AND status='COMPLETED'", [preview.fingerprint]);
     if (previous[0]) throw new Error("This exact file was already imported.");
     const batchId = createId("import");
     let created = 0;
     let updated = 0;
     let skipped = 0;
-    await this.db.transaction(async () => {
-      const now = nowIso();
-      await this.db.run("INSERT INTO import_batches(id, request_key, source_name, source_fingerprint, status, row_count, actor_id, created_at) VALUES (?, ?, ?, ?, 'PROCESSING', ?, ?, ?)", [batchId, createId("importrequest"), preview.sourceName, preview.fingerprint, preview.rows.length, actor.id, now], false);
-      for (const row of preview.rows) {
-        const matches = await this.db.query<{ id: string }>(
-          `SELECT DISTINCT p.id FROM products p LEFT JOIN product_barcodes b ON b.product_id=p.id
-           WHERE p.deleted_at IS NULL AND (p.sku=? COLLATE NOCASE OR (? IS NOT NULL AND b.value=? COLLATE NOCASE)) LIMIT 1`,
-          [row.sku, row.barcode, row.barcode]
-        );
-        const existingId = matches[0]?.id;
-        if (existingId && duplicateAction === "SKIP") {
-          skipped += 1;
-          continue;
+    const startedAt = nowIso();
+    await this.db.run("INSERT INTO import_batches(id, request_key, source_name, source_fingerprint, status, row_count, actor_id, created_at) VALUES (?, ?, ?, ?, 'PROCESSING', ?, ?, ?)", [batchId, createId("importrequest"), preview.sourceName, preview.fingerprint, preview.rows.length, actor.id, startedAt]);
+    try {
+      await this.db.transaction(async () => {
+        const chunkSize = 250;
+        for (let offset = 0; offset < preview.rows.length; offset += chunkSize) {
+          if (options.signal?.aborted) throw new Error("Import cancelled. No product changes were saved.");
+          const rows = preview.rows.slice(offset, offset + chunkSize);
+          const skuValues = rows.map((row) => row.sku);
+          const barcodeValues = rows.map((row) => row.barcode).filter((value): value is string => Boolean(value));
+          const existingSkuRows = skuValues.length ? await this.db.query<{ id: string; sku: string }>(`SELECT id, sku FROM products WHERE deleted_at IS NULL AND sku IN (${placeholders(skuValues)})`, skuValues) : [];
+          const existingBarcodeRows = barcodeValues.length ? await this.db.query<{ product_id: string; value: string }>(`SELECT product_id, value FROM product_barcodes WHERE value IN (${placeholders(barcodeValues)})`, barcodeValues) : [];
+          const bySku = new Map(existingSkuRows.map((entry) => [entry.sku.toLocaleLowerCase(), entry.id]));
+          const byBarcode = new Map(existingBarcodeRows.map((entry) => [entry.value.toLocaleLowerCase(), entry.product_id]));
+          const statements: Array<{ statement: string; values: Array<string | number | null> }> = [];
+          const now = nowIso();
+          for (const row of rows) {
+            const skuMatch = bySku.get(row.sku.toLocaleLowerCase());
+            const barcodeMatch = row.barcode ? byBarcode.get(row.barcode.toLocaleLowerCase()) : undefined;
+            if (skuMatch && barcodeMatch && skuMatch !== barcodeMatch) throw new Error(`Row ${row.rowNumber} matches different products by SKU and barcode.`);
+            const existingId = skuMatch ?? barcodeMatch;
+            if (existingId && duplicateAction === "SKIP") { skipped += 1; continue; }
+            const productId = existingId ?? createId("product");
+            if (existingId) {
+              statements.push({ statement: `UPDATE products SET name=?, inventory_unit=?, selling_unit=?, cost_price_cents=?, retail_price_cents=?, wholesale_price_cents=?, minimum_stock_micro=?, status='ACTIVE', updated_at=? WHERE id=?`, values: [row.name, row.inventoryUnit, row.sellingUnit, row.costPriceCents, row.retailPriceCents, row.wholesalePriceCents, row.minimumStockMicro, now, productId] });
+              if (row.barcode) {
+                statements.push({ statement: "DELETE FROM product_barcodes WHERE product_id=? AND is_primary=1", values: [productId] });
+                statements.push({ statement: "INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", values: [createId("barcode"), productId, row.barcode, now] });
+              }
+              updated += 1;
+            } else {
+              statements.push({ statement: `INSERT INTO products(id, sku, name, inventory_unit, selling_unit, cost_price_cents, retail_price_cents, wholesale_price_cents, minimum_stock_micro, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values: [productId, row.sku, row.name, row.inventoryUnit, row.sellingUnit, row.costPriceCents, row.retailPriceCents, row.wholesalePriceCents, row.minimumStockMicro, now, now] });
+              if (row.barcode) statements.push({ statement: "INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", values: [createId("barcode"), productId, row.barcode, now] });
+              created += 1;
+            }
+            statements.push({ statement: "INSERT INTO audit_logs(id, actor_id, action, entity_type, entity_id, reason, metadata_json, created_at) VALUES (?, ?, ?, 'Product', ?, ?, ?, ?)", values: [createId("audit"), actor.id, existingId ? "PRODUCT_UPDATED" : "PRODUCT_CREATED", productId, `Imported from ${preview.sourceName}`, JSON.stringify({ sku: row.sku, name: row.name, importBatchId: batchId }), now] });
+            if (row.startingStockMicro > 0) {
+              statements.push({ statement: `INSERT INTO inventory_stock(product_id, warehouse_id, quantity_micro, updated_at) VALUES (?, 'warehouse_main', ?, ?) ON CONFLICT(product_id,warehouse_id) DO UPDATE SET quantity_micro=inventory_stock.quantity_micro+excluded.quantity_micro, updated_at=excluded.updated_at`, values: [productId, row.startingStockMicro, now] });
+              statements.push({ statement: "INSERT INTO inventory_movements(id, product_id, warehouse_id, type, quantity_micro, unit_cost_cents, reference_type, reference_id, reason, actor_id, created_at) VALUES (?, ?, 'warehouse_main', 'STOCK_IN', ?, ?, 'ImportBatch', ?, ?, ?, ?)", values: [createId("movement"), productId, row.startingStockMicro, row.costPriceCents, batchId, `Imported from ${preview.sourceName}`, actor.id, now] });
+            }
+          }
+          await this.db.executeSet(statements, false);
+          options.onProgress?.({ processed: Math.min(offset + rows.length, preview.rows.length), total: preview.rows.length, created, updated, skipped });
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
-        const productId = existingId ?? createId("product");
-        if (existingId) {
-          await this.db.run(
-            `UPDATE products SET name=?, inventory_unit=?, selling_unit=?, cost_price_cents=?, retail_price_cents=?, wholesale_price_cents=?, minimum_stock_micro=?, status='ACTIVE', updated_at=? WHERE id=?`,
-            [row.name, row.inventoryUnit, row.sellingUnit, row.costPriceCents, row.retailPriceCents, row.wholesalePriceCents, row.minimumStockMicro, now, productId],
-            false
-          );
-          updated += 1;
-        } else {
-          await this.db.run(
-            `INSERT INTO products(id, sku, name, inventory_unit, selling_unit, cost_price_cents, retail_price_cents, wholesale_price_cents, minimum_stock_micro, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [productId, row.sku, row.name, row.inventoryUnit, row.sellingUnit, row.costPriceCents, row.retailPriceCents, row.wholesalePriceCents, row.minimumStockMicro, now, now],
-            false
-          );
-          if (row.barcode) await this.db.run("INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", [createId("barcode"), productId, row.barcode, now], false);
-          created += 1;
-        }
-        await audit(this.db, {
-          actorId: actor.id,
-          action: existingId ? "PRODUCT_UPDATED" : "PRODUCT_CREATED",
-          entityType: "Product",
-          entityId: productId,
-          reason: `Imported from ${preview.sourceName}`,
-          metadata: { sku: row.sku, name: row.name, importBatchId: batchId }
-        });
-        if (row.startingStockMicro > 0) {
-          const stock = await this.db.query<{ quantity_micro: number }>("SELECT quantity_micro FROM inventory_stock WHERE product_id=? AND warehouse_id='warehouse_main'", [productId]);
-          const previousStock = Number(stock[0]?.quantity_micro ?? 0);
-          const nextStock = existingId ? previousStock + row.startingStockMicro : row.startingStockMicro;
-          await this.db.run(
-            `INSERT INTO inventory_stock(product_id, warehouse_id, quantity_micro, updated_at) VALUES (?, 'warehouse_main', ?, ?)
-             ON CONFLICT(product_id,warehouse_id) DO UPDATE SET quantity_micro=excluded.quantity_micro, updated_at=excluded.updated_at`,
-            [productId, nextStock, now],
-            false
-          );
-          await this.db.run(
-            "INSERT INTO inventory_movements(id, product_id, warehouse_id, type, quantity_micro, unit_cost_cents, reference_type, reference_id, reason, actor_id, created_at) VALUES (?, ?, 'warehouse_main', 'STOCK_IN', ?, ?, 'ImportBatch', ?, ?, ?, ?)",
-            [createId("movement"), productId, row.startingStockMicro, row.costPriceCents, batchId, `Imported from ${preview.sourceName}`, actor.id, now],
-            false
-          );
-        }
-      }
-      await this.db.run("UPDATE import_batches SET status='COMPLETED', created_count=?, updated_count=?, skipped_count=?, summary_json=?, completed_at=? WHERE id=?", [created, updated, skipped, JSON.stringify({ validCount: preview.validCount }), now, batchId], false);
-      await audit(this.db, { actorId: actor.id, action: "PRODUCT_IMPORT_COMPLETED", entityType: "ImportBatch", entityId: batchId, metadata: { sourceName: preview.sourceName, created, updated, skipped } });
-    });
+        const completedAt = nowIso();
+        await this.db.run("UPDATE import_batches SET status='COMPLETED', created_count=?, updated_count=?, skipped_count=?, summary_json=?, completed_at=? WHERE id=?", [created, updated, skipped, JSON.stringify({ validCount: preview.validCount }), completedAt, batchId], false);
+        await audit(this.db, { actorId: actor.id, action: "PRODUCT_IMPORT_COMPLETED", entityType: "ImportBatch", entityId: batchId, metadata: { sourceName: preview.sourceName, created, updated, skipped } });
+      });
+    } catch (error) {
+      await this.db.run("UPDATE import_batches SET status=?, failed_count=?, summary_json=?, completed_at=? WHERE id=?", [options.signal?.aborted ? "CANCELLED" : "FAILED", preview.rows.length, JSON.stringify({ message: error instanceof Error ? error.message : "Import failed" }), nowIso(), batchId]);
+      throw error;
+    }
     return { batchId, created, updated, skipped };
   }
 

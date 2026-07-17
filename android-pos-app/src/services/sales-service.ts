@@ -1,7 +1,7 @@
 import type { LocalDatabase } from "../data/database";
 import { netCashReceived } from "../domain/cash-drawer";
 import { assertSufficientPayment, lineTotals, saleTotals, toBaseQuantity } from "../domain/calculations";
-import { createId, nowIso, type CartLine, type SaleCommand, type SaleSummary, type UnitCode } from "../domain/models";
+import { createId, nowIso, type CartLine, type PageResult, type SaleCommand, type SaleSummary, type UnitCode } from "../domain/models";
 import { audit, nextNumber } from "./service-helpers";
 import { recordAutomaticCashMovement } from "./cash-drawer-service";
 import { operationCoordinator, type OperationCoordinator } from "./operation-coordinator";
@@ -18,6 +18,28 @@ type ProductSaleRow = {
   tax_basis_points: number;
   quantity_micro: number;
 };
+
+export type SalePageQuery = {
+  search?: string;
+  status?: string | null;
+  paymentMethod?: string | null;
+  fromIso?: string | null;
+  toExclusiveIso?: string | null;
+  pageSize?: number;
+  cursor?: string | null;
+};
+
+function encodeSaleCursor(sale: SaleSummary) {
+  return encodeURIComponent(JSON.stringify([sale.createdAt, sale.id]));
+}
+
+function decodeSaleCursor(cursor: string | null | undefined) {
+  if (!cursor) return null;
+  try {
+    const value = JSON.parse(decodeURIComponent(cursor)) as unknown;
+    return Array.isArray(value) && typeof value[0] === "string" && typeof value[1] === "string" ? { createdAt: value[0], id: value[1] } : null;
+  } catch { return null; }
+}
 
 type PreparedLine = CartLine & {
   warehouseId: string;
@@ -192,7 +214,8 @@ export class SalesService {
           [saleItemId, saleId, line.productId, line.warehouseId, line.soldQuantityMicro, line.soldUnit, line.baseQuantityMicro, line.unitPriceCents, line.totals.discountCents, line.totals.taxCents, line.totals.totalCents],
           false
         );
-        await this.db.run("UPDATE inventory_stock SET quantity_micro=quantity_micro-?, updated_at=? WHERE product_id=? AND warehouse_id=?", [line.baseQuantityMicro, now, line.productId, line.warehouseId], false);
+        const stockChanged = await this.db.run("UPDATE inventory_stock SET quantity_micro=quantity_micro-?, updated_at=? WHERE product_id=? AND warehouse_id=? AND quantity_micro>=?", [line.baseQuantityMicro, now, line.productId, line.warehouseId, line.baseQuantityMicro], false);
+        if (Number(stockChanged.changes?.changes ?? 0) !== 1) throw new Error(`${line.name} stock changed before checkout. Reload the product and try again.`);
         await this.db.run(
           "INSERT INTO inventory_movements(id, product_id, warehouse_id, type, quantity_micro, reference_type, reference_id, reason, actor_id, created_at) VALUES (?, ?, ?, 'SALE', ?, 'Sale', ?, ?, ?, ?)",
           [createId("movement"), line.productId, line.warehouseId, -line.baseQuantityMicro, saleId, `Sale ${receiptNumber}`, command.cashierId, now],
@@ -236,15 +259,34 @@ export class SalesService {
     }
   }
 
-  async listSales(limit = 200) {
+  /** Returns a bounded, database-filtered sales page without loading lifetime history. */
+  async listSalesPage(query: SalePageQuery = {}): Promise<PageResult<SaleSummary>> {
+    const pageSize = Math.min(Math.max(Math.trunc(query.pageSize ?? 100), 10), 200);
+    const cursor = decodeSaleCursor(query.cursor);
+    const search = query.search?.trim() ?? "";
+    const where = ["s.deleted_at IS NULL"];
+    const values: Array<string | number | null> = [];
+    if (search) { where.push("(s.receipt_number=? COLLATE NOCASE OR s.receipt_number LIKE ? COLLATE NOCASE OR s.order_number LIKE ? COLLATE NOCASE)"); values.push(search, `${search}%`, `${search}%`); }
+    if (query.status) { where.push("s.status=?"); values.push(query.status); }
+    if (query.paymentMethod) { where.push("EXISTS(SELECT 1 FROM sale_payments sp WHERE sp.sale_id=s.id AND sp.method=?)"); values.push(query.paymentMethod); }
+    if (query.fromIso) { where.push("s.created_at>=?"); values.push(query.fromIso); }
+    if (query.toExclusiveIso) { where.push("s.created_at<?"); values.push(query.toExclusiveIso); }
+    if (cursor) { where.push("(s.created_at<? OR (s.created_at=? AND s.id<?))"); values.push(cursor.createdAt, cursor.createdAt, cursor.id); }
     const rows = await this.db.query<{
       id: string; receipt_number: string; order_number: string | null; order_type: string; status: string;
       grand_total_cents: number; paid_total_cents: number; change_total_cents: number; created_at: string;
-    }>("SELECT id, receipt_number, order_number, order_type, status, grand_total_cents, paid_total_cents, change_total_cents, created_at FROM sales WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT ?", [Math.min(Math.max(limit, 1), 1000)]);
-    return rows.map((row) => ({
+    }>(`SELECT s.id, s.receipt_number, s.order_number, s.order_type, s.status, s.grand_total_cents, s.paid_total_cents, s.change_total_cents, s.created_at
+        FROM sales s WHERE ${where.join(" AND ")} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`, [...values, pageSize + 1]);
+    const mapped = rows.map((row) => ({
       id: row.id, receiptNumber: row.receipt_number, orderNumber: row.order_number, orderType: row.order_type, status: row.status,
       grandTotalCents: Number(row.grand_total_cents), paidTotalCents: Number(row.paid_total_cents), changeTotalCents: Number(row.change_total_cents), createdAt: row.created_at
     } satisfies SaleSummary));
+    const items = mapped.slice(0, pageSize);
+    return { items, nextCursor: mapped.length > pageSize && items.length ? encodeSaleCursor(items[items.length - 1]!) : null };
+  }
+
+  async listSales(limit = 200) {
+    return (await this.listSalesPage({ pageSize: Math.min(limit, 200) })).items;
   }
 
   async getSale(id: string): Promise<SaleDetail> {

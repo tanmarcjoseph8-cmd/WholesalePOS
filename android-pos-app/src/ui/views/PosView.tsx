@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Banknote, Minus, Plus, Printer, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { moneyInputToCents, paymentBalance, toBaseQuantity } from "../../domain/calculations";
 import { createId, formatMoney, formatQuantity, QUANTITY_SCALE, type CartLine, type ProductRecord } from "../../domain/models";
@@ -6,11 +6,19 @@ import type { SaleDetail } from "../../services/sales-service";
 import { useOfflineApp } from "../app-context";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SaleReceiptDialog } from "../SaleReceiptDialog";
+import { useDebouncedValue } from "../use-debounced-value";
+import { fileService } from "../../platform/file-service";
 
 export function PosView() {
   const { app, user, revision, refresh, setUnsaved, notify, openCashDrawer } = useOfflineApp();
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [priceLevels, setPriceLevels] = useState<Array<{ code: string; name: string }>>([]);
+  const [priceLevelCode, setPriceLevelCode] = useState("AUTO");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cash, setCash] = useState(0);
   const [gcash, setGcash] = useState(0);
@@ -20,10 +28,25 @@ export function PosView() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [cashDrawerOpen, setCashDrawerOpen] = useState(false);
   const requestKey = useRef(createId("checkout"));
+  const catalogRequest = useRef(0);
+  const knownProducts = useRef(new Map<string, ProductRecord>());
 
-  useEffect(() => { void app.catalog.listProducts(search).then(setProducts); }, [app, search, revision]);
+  useEffect(() => {
+    const request = ++catalogRequest.current;
+    setCatalogLoading(true);
+    setCatalogError(null);
+    void app.catalog.listProductPage({ search: debouncedSearch, pageSize: 60 }).then((page) => {
+      if (request !== catalogRequest.current) return;
+      setProducts(page.items);
+      setNextCursor(page.nextCursor);
+    }).catch((caught: unknown) => {
+      if (request === catalogRequest.current) setCatalogError(caught instanceof Error ? caught.message : "Products could not be loaded.");
+    }).finally(() => { if (request === catalogRequest.current) setCatalogLoading(false); });
+  }, [app, debouncedSearch, revision]);
   useEffect(() => { void app.cashDrawer.current(user).then((session) => setCashDrawerOpen(Boolean(session))).catch(() => setCashDrawerOpen(false)); }, [app, user, revision]);
+  useEffect(() => { void app.pricing.listLevels().then(setPriceLevels); }, [app, revision]);
   useEffect(() => { setUnsaved(cart.length > 0); return () => setUnsaved(false); }, [cart.length, setUnsaved]);
+  useEffect(() => { for (const product of products) knownProducts.current.set(product.id, product); }, [products]);
 
   const total = useMemo(() => cart.reduce((sum, line) => {
     const gross = Math.round((line.unitPriceCents * line.soldQuantityMicro) / QUANTITY_SCALE);
@@ -32,28 +55,61 @@ export function PosView() {
   }, 0), [cart]);
   const payment = useMemo(() => paymentBalance(total, cash + gcash), [cash, gcash, total]);
 
-  function addProduct(product: ProductRecord) {
+  async function addProduct(product: ProductRecord) {
+    knownProducts.current.set(product.id, product);
+    const currentLine = cart.find((line) => line.productId === product.id);
+    const nextSoldQuantityMicro = (currentLine?.soldQuantityMicro ?? 0) + QUANTITY_SCALE;
+    const nextBaseQuantityMicro = toBaseQuantity(nextSoldQuantityMicro, product.unitRatioMicro);
+    let selectedPrice: number;
+    try {
+      selectedPrice = priceLevelCode === "AUTO"
+        ? (product.wholesaleThresholdMicro > 0 && nextBaseQuantityMicro >= product.wholesaleThresholdMicro ? product.wholesalePriceCents : product.retailPriceCents)
+        : await app.pricing.resolve(product.id, priceLevelCode, nextBaseQuantityMicro);
+    }
+    catch (caught) { notify(caught instanceof Error ? caught.message : "Product price could not be loaded.", "error"); return; }
     setCart((current) => {
       const existing = current.find((line) => line.productId === product.id);
       if (existing) return current.map((line) => {
         if (line.productId !== product.id) return line;
         const soldQuantityMicro = line.soldQuantityMicro + QUANTITY_SCALE;
         const baseQuantityMicro = toBaseQuantity(soldQuantityMicro, product.unitRatioMicro);
-        const unitPriceCents = product.wholesaleThresholdMicro > 0 && baseQuantityMicro >= product.wholesaleThresholdMicro ? product.wholesalePriceCents : product.retailPriceCents;
-        return { ...line, soldQuantityMicro, baseQuantityMicro, unitPriceCents };
+        return { ...line, soldQuantityMicro, baseQuantityMicro, unitPriceCents: selectedPrice };
       });
       const baseQuantityMicro = toBaseQuantity(QUANTITY_SCALE, product.unitRatioMicro);
-      const unitPriceCents = product.wholesaleThresholdMicro > 0 && baseQuantityMicro >= product.wholesaleThresholdMicro ? product.wholesalePriceCents : product.retailPriceCents;
-      return [...current, { productId: product.id, name: product.name, soldQuantityMicro: QUANTITY_SCALE, soldUnit: product.sellingUnit, baseQuantityMicro, unitPriceCents, discountCents: 0, taxBasisPoints: product.taxBasisPoints }];
+      return [...current, { productId: product.id, name: product.name, soldQuantityMicro: QUANTITY_SCALE, soldUnit: product.sellingUnit, baseQuantityMicro, unitPriceCents: selectedPrice, discountCents: 0, taxBasisPoints: product.taxBasisPoints }];
     });
   }
 
-  function setQuantity(productId: string, value: number) {
-    const product = products.find((entry) => entry.id === productId);
+  async function loadMoreProducts() {
+    if (!nextCursor || catalogLoading) return;
+    setCatalogLoading(true);
+    try {
+      const page = await app.catalog.listProductPage({ search: debouncedSearch, pageSize: 60, cursor: nextCursor });
+      setProducts((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch (caught) { setCatalogError(caught instanceof Error ? caught.message : "More products could not be loaded."); }
+    finally { setCatalogLoading(false); }
+  }
+
+  async function scanOnEnter(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter" || !search.trim()) return;
+    event.preventDefault();
+    try {
+      const product = await app.catalog.findByBarcode(search);
+      if (!product) return;
+      if (product.availableMicro <= 0) notify(`${product.name} is out of stock.`, "error");
+      else { await addProduct(product); setSearch(""); }
+    } catch (caught) { notify(caught instanceof Error ? caught.message : "Barcode lookup failed.", "error"); }
+  }
+
+  async function setQuantity(productId: string, value: number) {
+    const product = knownProducts.current.get(productId);
     if (!product) return;
     const soldQuantityMicro = Math.max(1, Math.round(value * QUANTITY_SCALE));
     const baseQuantityMicro = toBaseQuantity(soldQuantityMicro, product.unitRatioMicro);
-    const unitPriceCents = product.wholesaleThresholdMicro > 0 && baseQuantityMicro >= product.wholesaleThresholdMicro ? product.wholesalePriceCents : product.retailPriceCents;
+    let unitPriceCents: number;
+    try { unitPriceCents = priceLevelCode === "AUTO" ? (product.wholesaleThresholdMicro > 0 && baseQuantityMicro >= product.wholesaleThresholdMicro ? product.wholesalePriceCents : product.retailPriceCents) : await app.pricing.resolve(product.id, priceLevelCode, baseQuantityMicro); }
+    catch (caught) { notify(caught instanceof Error ? caught.message : "Product price could not be loaded.", "error"); return; }
     setCart((current) => current.map((line) => line.productId === productId ? { ...line, soldQuantityMicro, baseQuantityMicro, unitPriceCents } : line));
   }
 
@@ -87,11 +143,15 @@ export function PosView() {
     <section className="page-stack pos-layout">
       <div className="catalog-pane">
         <header className="page-header"><div><h2>Point of Sale</h2><p>Search, scan, and sell from local stock.</p></div></header>
-        <label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Product name, SKU, or barcode" autoFocus /></label>
+        <label className="price-level-control">Price level<select value={priceLevelCode} disabled={cart.length > 0} onChange={(event) => setPriceLevelCode(event.target.value)}><option value="AUTO">Automatic retail / wholesale</option>{priceLevels.map((level) => <option value={level.code} key={level.code}>{level.name}</option>)}</select></label>
+        <label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => void scanOnEnter(event)} placeholder="Product name, SKU, or barcode" autoFocus /></label>
+        {catalogError ? <p className="inline-error" role="alert">{catalogError}</p> : null}
         <div className="product-grid">
-          {products.map((product) => <button className="product-tile" key={product.id} disabled={product.availableMicro <= 0} onClick={() => addProduct(product)}><strong>{product.name}</strong><span>{product.sku}</span><b>{formatMoney(product.retailPriceCents)}</b><small className={product.availableMicro <= product.minimumStockMicro ? "low" : ""}>{formatQuantity(product.availableMicro)} {product.inventoryUnit.toLowerCase()} available</small></button>)}
-          {!products.length ? <p className="empty-state">No matching products.</p> : null}
+          {products.map((product) => <button className="product-tile" key={product.id} disabled={product.availableMicro <= 0} onClick={() => void addProduct(product)}>{product.thumbnailPath ? <img className="product-thumbnail" src={fileService.localAssetUrl(product.thumbnailPath) ?? undefined} alt="" loading="lazy" /> : null}<strong>{product.name}</strong><span>{product.sku}</span><b>{formatMoney(product.retailPriceCents)}</b><small className={product.availableMicro <= product.minimumStockMicro ? "low" : ""}>{formatQuantity(product.availableMicro)} {product.inventoryUnit.toLowerCase()} available</small></button>)}
+          {catalogLoading && !products.length ? <p className="loading" role="status">Loading products...</p> : null}
+          {!catalogLoading && !products.length ? <p className="empty-state">No matching products.</p> : null}
         </div>
+        {nextCursor ? <button className="button secondary load-more" disabled={catalogLoading} onClick={() => void loadMoreProducts()}>{catalogLoading ? "Loading..." : "Load more products"}</button> : null}
       </div>
       <aside className="cart-pane">
         <h3><ShoppingCart size={20} /> Current cart</h3>

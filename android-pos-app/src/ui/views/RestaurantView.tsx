@@ -6,6 +6,7 @@ import type { SaleDetail } from "../../services/sales-service";
 import { useOfflineApp } from "../app-context";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SaleReceiptDialog } from "../SaleReceiptDialog";
+import { useDebouncedValue } from "../use-debounced-value";
 
 const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = { OPEN: "CONFIRMED", CONFIRMED: "PREPARING", PREPARING: "READY", READY: "SERVED" };
 
@@ -18,6 +19,9 @@ export function RestaurantView() {
   const [editing, setEditing] = useState<OrderRecord | null>(null);
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [productSearch, setProductSearch] = useState("");
+  const debouncedProductSearch = useDebouncedValue(productSearch);
+  const [productCursor, setProductCursor] = useState<string | null>(null);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [newOrderType, setNewOrderType] = useState<OrderType>("WALK_IN");
   const [serviceChargeBasisPoints, setServiceChargeBasisPoints] = useState(0);
   const [cash, setCash] = useState(0);
@@ -28,17 +32,37 @@ export function RestaurantView() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [cashDrawerOpen, setCashDrawerOpen] = useState(false);
   const checkoutKey = useRef(createId("ordercheckout"));
+  const productRequest = useRef(0);
+  const editingRef = useRef<OrderRecord | null>(null);
+  const linesRef = useRef<OrderLine[]>([]);
+  const notifyRef = useRef(notify);
+
+  useEffect(() => { editingRef.current = editing; }, [editing]);
+  useEffect(() => { linesRef.current = lines; }, [lines]);
+  useEffect(() => { notifyRef.current = notify; }, [notify]);
 
   useEffect(() => {
-    void Promise.all([app.restaurant.listTables(true), app.restaurant.listOrders(false), app.catalog.listProducts(productSearch), app.settingsReports.getSettings()]).then(([nextTables, nextOrders, nextProducts, nextSettings]) => {
-      setTables(nextTables); setOrders(nextOrders); setProducts(nextProducts);
+    void Promise.all([app.restaurant.listTables(true), app.restaurant.listOrders(false), app.settingsReports.getSettings()]).then(([nextTables, nextOrders, nextSettings]) => {
+      setTables(nextTables); setOrders(nextOrders);
       setServiceChargeBasisPoints(nextSettings.serviceChargeBasisPoints);
-      if (editing) {
-        const fresh = nextOrders.find((order) => order.id === editing.id);
-        if (fresh && fresh.version !== editing.version) { setEditing(fresh); setLines(fresh.lines); }
+      const current = editingRef.current;
+      if (current) {
+        const fresh = nextOrders.find((order) => order.id === current.id);
+        if (fresh && fresh.version !== current.version) { setEditing(fresh); setLines(fresh.lines); }
       }
     });
-  }, [app, revision, productSearch, editing]);
+  }, [app, revision]);
+  useEffect(() => {
+    const request = ++productRequest.current;
+    setProductsLoading(true);
+    void app.catalog.listProductPage({ search: debouncedProductSearch, pageSize: 60 }).then((page) => {
+      if (request !== productRequest.current) return;
+      setProducts((current) => [...page.items, ...current.filter((product) => linesRef.current.some((line) => line.productId === product.id) && !page.items.some((item) => item.id === product.id))]);
+      setProductCursor(page.nextCursor);
+    }).catch((caught: unknown) => {
+      if (request === productRequest.current) notifyRef.current(caught instanceof Error ? caught.message : "Menu products could not be loaded.", "error");
+    }).finally(() => { if (request === productRequest.current) setProductsLoading(false); });
+  }, [app, debouncedProductSearch, revision]);
   useEffect(() => { void app.cashDrawer.current(user).then((session) => setCashDrawerOpen(Boolean(session))).catch(() => setCashDrawerOpen(false)); }, [app, user, revision]);
   useEffect(() => { setUnsaved(Boolean(editing && JSON.stringify(lines) !== JSON.stringify(editing.lines))); return () => setUnsaved(false); }, [editing, lines, setUnsaved]);
   useEffect(() => {
@@ -63,6 +87,17 @@ export function RestaurantView() {
   }, [lines, serviceChargeBasisPoints]);
   const total = totals.grandTotalCents;
   const payment = useMemo(() => paymentBalance(total, cash + gcash), [cash, gcash, total]);
+
+  async function loadMoreProducts() {
+    if (!productCursor || productsLoading) return;
+    setProductsLoading(true);
+    try {
+      const page = await app.catalog.listProductPage({ search: debouncedProductSearch, pageSize: 60, cursor: productCursor });
+      setProducts((current) => [...current, ...page.items]);
+      setProductCursor(page.nextCursor);
+    } catch (caught) { notify(caught instanceof Error ? caught.message : "More menu products could not be loaded.", "error"); }
+    finally { setProductsLoading(false); }
+  }
 
   function openEditor(order: OrderRecord) { setEditing(order); setLines(order.lines); setView("orders"); setCash(0); setGcash(0); checkoutKey.current = createId("ordercheckout"); }
 
@@ -188,6 +223,7 @@ export function RestaurantView() {
     <section className="page-stack">
       <header className="page-header"><div><h2>Restaurant</h2><p>Tables and unpaid orders use the same local products and inventory.</p></div><div className="header-actions order-create">{completed ? <button className="button secondary" onClick={() => setReceiptOpen(true)}><Printer size={18} /> Last receipt</button> : null}<select aria-label="New order type" value={newOrderType} onChange={(event) => setNewOrderType(event.target.value as OrderType)}>{orderTypes.filter((type) => type !== "DINE_IN").map((type) => <option value={type} key={type}>{type.replaceAll("_", " ")}</option>)}</select><button className="button secondary" onClick={() => void createOrder(undefined, newOrderType)} disabled={busy}><Plus size={18} /> New order</button>{canManageTables ? <button className="button primary" onClick={() => void addTable()}><Armchair size={18} /> Table</button> : null}</div></header>
       <div className="segmented"><button className={view === "tables" ? "active" : ""} onClick={() => setView("tables")}>Tables</button><button className={view === "orders" ? "active" : ""} onClick={() => setView("orders")}>Active orders</button></div>
+      {view === "orders" && editing && productCursor ? <button className="button secondary load-more" disabled={productsLoading} onClick={() => void loadMoreProducts()}>{productsLoading ? "Loading products..." : "Load more menu products"}</button> : null}
       {view === "tables" ? <div className="table-sections">{[...new Set(tables.filter((table) => table.isActive).map((table) => table.section))].map((section) => <section key={section}><h3>{section}</h3><div className="restaurant-table-grid">{tables.filter((table) => table.isActive && table.section === section).map((table) => <article className={`restaurant-table status-${table.status.toLowerCase()}`} key={table.id}><div><strong>Table {table.number}</strong><span><Users size={15} /> {table.guestCount}/{table.capacity}</span></div>{canManageTables ? <div className="table-tools"><button aria-label={`Edit table ${table.number}`} onClick={() => void editTable(table)}><Pencil size={16} /></button><button aria-label={`Remove table ${table.number}`} disabled={Boolean(table.activeOrderId)} onClick={() => void deactivateTable(table)}><Power size={16} /></button></div> : null}<p>{table.status.toLowerCase()}</p>{table.activeOrderId ? <button className="button secondary" onClick={() => { const order = orders.find((entry) => entry.id === table.activeOrderId); if (order) openEditor(order); }}>Resume {table.activeOrderNumber}</button> : table.status === "AVAILABLE" ? <button className="button primary" onClick={() => void createOrder(table, "DINE_IN")}>Open table</button> : table.status === "CLEANING" && canManageTables ? <button className="button secondary" onClick={() => void app.restaurant.saveTable(user, { id: table.id, number: table.number, section: table.section, capacity: table.capacity, status: "AVAILABLE" }).then(refresh)}><Check size={16} /> Mark ready</button> : null}</article>)}</div></section>)}</div> : null}
       {view === "orders" ? <div className="restaurant-workspace"><aside className="order-list">{orders.map((order) => <button className={editing?.id === order.id ? "selected" : ""} onClick={() => openEditor(order)} key={order.id}><strong>{order.orderNumber}</strong><span>{order.customOrderType ?? order.orderType.replaceAll("_", " ")}</span><b>{order.status}</b></button>)}{!orders.length ? <p className="empty-state">No active orders.</p> : null}</aside>{editing ? <section className="order-editor"><header><div><span className="eyebrow">{editing.orderType.replaceAll("_", " ")}</span><h3>{editing.orderNumber}</h3></div><div className="header-actions"><button className="button secondary" onClick={() => void save()} disabled={busy}>Save</button>{nextStatus[editing.status] ? <button className="button primary" onClick={() => void save(nextStatus[editing.status])} disabled={busy}>{nextStatus[editing.status]}</button> : null}</div></header><div className="order-fields"><label>Customer<input value={editing.customerName ?? ""} onChange={(event) => setEditing({ ...editing, customerName: event.target.value || null })} /></label><label>Guests<input type="number" min="1" value={editing.guestCount} onChange={(event) => setEditing({ ...editing, guestCount: Number(event.target.value) })} /></label><label className="span-2">Notes<input value={editing.notes ?? ""} onChange={(event) => setEditing({ ...editing, notes: event.target.value || null })} /></label></div><div className="order-content"><section><h4>Order items</h4>{lines.map((line) => <article className="order-line" key={line.productId}><div><strong>{line.name}</strong><span>{formatMoney(line.unitPriceCents)}</span></div><input aria-label={`${line.name} quantity`} type="number" min="0.001" step="any" value={line.soldQuantityMicro / QUANTITY_SCALE} onChange={(event) => { const product = products.find((entry) => entry.id === line.productId); const sold = Math.max(1, Math.round(Number(event.target.value) * QUANTITY_SCALE)); setLines((current) => current.map((entry) => entry.productId === line.productId ? { ...entry, soldQuantityMicro: sold, baseQuantityMicro: toBaseQuantity(sold, product?.unitRatioMicro ?? QUANTITY_SCALE) } : entry)); }} /><input aria-label={`${line.name} discount`} type="number" min="0" step="0.01" value={line.discountCents / 100} onChange={(event) => setLines((current) => current.map((entry) => entry.productId === line.productId ? { ...entry, discountCents: Math.max(0, Math.round(Number(event.target.value) * 100)) } : entry))} /><button className="icon-danger" aria-label={`Remove ${line.name}`} onClick={() => setLines((current) => current.filter((entry) => entry.productId !== line.productId))}><Trash2 size={18} /></button></article>)}</section><aside><label className="search-box"><Search size={17} /><input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Find menu item" /></label>{products.map((product) => <button className="menu-product" key={product.id} disabled={product.availableMicro <= 0} onClick={() => addProduct(product)}><strong>{product.name}</strong><span>{formatMoney(product.retailPriceCents)}</span><small>{formatQuantity(product.availableMicro)} available</small></button>)}</aside></div><div className="order-total"><span>Total</span><strong>{formatMoney(total)}</strong></div><div className="order-actions"><button className="button secondary" onClick={() => void transferOrder()}><ArrowRightLeft size={17} /> Move</button><button className="button secondary" onClick={() => void mergeOrder()}><Merge size={17} /> Merge</button><button className="button secondary" onClick={() => void splitOrder()}><Scissors size={17} /> Split</button><button className="button secondary" onClick={() => { const reason = window.prompt("Undo reason"); if (reason) void app.restaurant.undoLastItemChange(user, editing.id, editing.version, reason).then((next) => { setEditing(next); setLines(next.lines); refresh(); }); }}><Undo2 size={17} /> Undo</button><button className="button danger" onClick={() => void cancelOrder()}>Cancel</button><button className="button primary" disabled={!lines.length} onClick={() => setCheckoutOpen(true)}>Pay</button></div></section> : <div className="empty-workspace"><RefreshCw size={32} /><strong>Select an order</strong></div>}</div> : null}
       <ConfirmDialog open={checkoutOpen} title={`Pay ${editing?.orderNumber ?? "order"}?`} confirmLabel={busy ? "Completing" : `Complete ${formatMoney(total)}`} disabled={busy || payment.dueCents > 0 || (cash > 0 && !cashDrawerOpen)} onClose={() => setCheckoutOpen(false)} onConfirm={() => void checkout()}><div className="payment-grid"><label>Cash<input type="number" min="0" step="0.01" value={cash / 100} onChange={(event) => setCash(moneyInputToCents(event.target.value))} /></label><label>GCash<input type="number" min="0" step="0.01" value={gcash / 100} onChange={(event) => setGcash(moneyInputToCents(event.target.value))} /></label></div>{cash > 0 && !cashDrawerOpen ? <div className="notice-band cash-drawer-notice"><span>Open the cash drawer before accepting cash.</span><button className="button secondary" onClick={openCashDrawer}><Banknote size={17} /> Open drawer</button></div> : null}<div className="payment-balance"><div><span>Amount received</span><strong>{formatMoney(payment.paidCents)}</strong></div><div className={payment.changeCents > 0 ? "change" : "due"}><span>{payment.changeCents > 0 ? "Change" : "Amount due"}</span><strong>{formatMoney(payment.changeCents > 0 ? payment.changeCents : payment.dueCents)}</strong></div></div><p>Payment will consume reservations and deduct physical stock once.</p></ConfirmDialog>

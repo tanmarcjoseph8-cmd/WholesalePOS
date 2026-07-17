@@ -55,6 +55,26 @@ No HTTP server, loopback port, remote database, or Windows process is required.
   rewriting business records. Startup, resume, and checkout verify the P-256
   signature with an embedded public JWK. Factory reset deliberately preserves
   this table.
+- Migration 9 adds keyset-page indexes, effective-dated product price rules, and
+  product-image metadata without rewriting existing products or transactions.
+
+## Large-data boundaries
+
+- `CatalogService` and `SalesService` own stable keyset cursors. UI views request
+  bounded pages and never treat an in-memory list as the complete database.
+- USB/Bluetooth scanner input uses the unique barcode index directly. Text search
+  is debounced and uses exact or prefix predicates.
+- `ImportExportService` validates before writing, preloads indexed conflicts per
+  250-row chunk, batches statements through one native bridge call, and commits
+  the complete import atomically.
+- `MobileReportService` aggregates totals, payments, order types, and product
+  rankings in SQLite. Only the latest 500 transaction-detail rows cross the
+  native bridge for a report.
+- `PricingService` resolves effective and quantity-aware rules, then falls back
+  to the legacy retail/wholesale product columns. Sale rows store the resolved
+  price permanently.
+- `ProductImageService` resizes images and thumbnails before writing app-private
+  files. Catalog rows carry only a thumbnail path, and POS images lazy-load.
 
 ## License boundary
 

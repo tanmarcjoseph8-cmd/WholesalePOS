@@ -1,9 +1,10 @@
 # Product Import Format
 
 Select a CSV, XLS, or XLSX file from **Inventory**. The first worksheet is used,
-with a limit of 5,000 rows per batch. The app previews valid and invalid rows,
+with a limit of 100,000 rows per batch. The app previews valid and invalid rows,
 rejects an import containing errors, detects an identical file fingerprint, and
-offers skip or update behavior for matching SKU/barcode records.
+offers skip or update behavior for matching SKU/barcode records. Duplicate SKU or
+barcode values inside the same file are rejected before any product is written.
 
 | Column | Required | Notes |
 | --- | --- | --- |
@@ -24,3 +25,8 @@ peso values, not centavos.
 
 See `product-import-template.csv` for an editable example. Make a full backup
 before a large update import.
+
+Large imports are committed as one transaction and sent to SQLite in 250-row
+batches. Cancelling or encountering an error rolls back every product and stock
+change from that import. CSV uses less memory than XLSX and is recommended for
+older Fire OS tablets.

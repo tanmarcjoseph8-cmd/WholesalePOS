@@ -35,6 +35,23 @@ export class FileService {
     return { uri: result.uri, path, bytes: verified.size };
   }
 
+  /** Writes an optimized product image to private app storage and returns its stable URI. */
+  async writeProductImage(path: string, base64Data: string) {
+    const result = await Filesystem.writeFile({ path: `product-images/${path}`, directory: Directory.Data, data: base64Data, recursive: true });
+    return result.uri;
+  }
+
+  /** Removes one app-owned product image without touching any unrelated file. */
+  async deleteProductImage(path: string) {
+    try { await Filesystem.deleteFile({ path: `product-images/${path}`, directory: Directory.Data }); }
+    catch { /* A missing optional image already satisfies cleanup. */ }
+  }
+
+  /** Converts a stored native file URI into a WebView-safe source URL. */
+  localAssetUrl(uri: string | null) {
+    return uri ? Capacitor.convertFileSrc(uri) : null;
+  }
+
   async clearGeneratedLocalFiles() {
     const generated = [
       { path: "exports", directory: Directory.Cache },

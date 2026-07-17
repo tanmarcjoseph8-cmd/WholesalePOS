@@ -4,6 +4,20 @@ Android changes are contained in `android-pos-app/`. The companion offline
 Windows authority is updated separately under `license-manager/` to issue and
 renew compatible signed licenses.
 
+## 0.8.0 scalability additions
+
+- `src/services/pricing-service.ts`, `product-image-service.ts`: effective-dated
+  price levels and app-private resized product images.
+- `src/ui/use-debounced-value.ts`: shared bounded-search debounce.
+- `src/services/catalog-service.test.ts`, `sales-pagination.test.ts`,
+  `pricing-service.test.ts`, `import-export-service.test.ts`: focused scalability
+  and compatibility tests.
+- `scripts/benchmark_scalability.py`: production-data-independent temporary
+  SQLite benchmark.
+- `docs/SCALABILITY_AUDIT.md`, `SCALABILITY_GUIDE.md`,
+  `PERFORMANCE_RESULTS.md`, and `PERFORMANCE_RESULTS.json`: audit, operations,
+  benchmark interpretation, and raw measurements.
+
 ## Project and build
 
 - `package.json`, `pnpm-lock.yaml`: independent dependencies and scripts.

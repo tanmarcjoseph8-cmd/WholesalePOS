@@ -1,5 +1,5 @@
 import type { LocalDatabase } from "../data/database";
-import { createId, createUuid, nowIso, type LocalUser, type ProductInput, type ProductRecord, type UnitCode } from "../domain/models";
+import { createId, createUuid, nowIso, type LocalUser, type PageResult, type ProductInput, type ProductRecord, type UnitCode } from "../domain/models";
 import { audit } from "./service-helpers";
 
 type ProductRow = {
@@ -23,6 +23,7 @@ type ProductRow = {
   stock_micro: number;
   reserved_micro: number;
   available_micro: number;
+  thumbnail_path: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,24 +50,57 @@ function mapProduct(row: ProductRow): ProductRecord {
     stockMicro: Number(row.stock_micro),
     reservedMicro: Number(row.reserved_micro),
     availableMicro: Number(row.available_micro),
+    thumbnailPath: row.thumbnail_path,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
 }
 
 const productSelect = `
-SELECT p.id, p.sku, b.value AS barcode, p.name, p.category_id, c.name AS category_name,
+SELECT p.id, p.sku,
+  (SELECT value FROM product_barcodes WHERE product_id=p.id AND is_primary=1 ORDER BY created_at LIMIT 1) AS barcode,
+  p.name, p.category_id, c.name AS category_name,
   p.inventory_unit, p.selling_unit, p.unit_ratio_micro, p.package_size_micro,
   p.cost_price_cents, p.retail_price_cents, p.wholesale_price_cents,
   p.wholesale_threshold_micro, p.tax_basis_points, p.minimum_stock_micro, p.status,
-  COALESCE(SUM(ai.physical_micro), 0) AS stock_micro,
-  COALESCE(SUM(ai.reserved_micro), 0) AS reserved_micro,
-  COALESCE(SUM(ai.available_micro), 0) AS available_micro,
+  COALESCE(s.quantity_micro, 0) AS stock_micro,
+  COALESCE((SELECT SUM(r.quantity_micro) FROM inventory_reservations r
+    WHERE r.product_id=p.id AND r.warehouse_id='warehouse_main' AND r.status='ACTIVE'), 0) AS reserved_micro,
+  COALESCE(s.quantity_micro, 0) - COALESCE((SELECT SUM(r.quantity_micro) FROM inventory_reservations r
+    WHERE r.product_id=p.id AND r.warehouse_id='warehouse_main' AND r.status='ACTIVE'), 0) AS available_micro,
+  (SELECT thumbnail_path FROM product_images WHERE product_id=p.id AND is_primary=1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 1) AS thumbnail_path,
   p.created_at, p.updated_at
 FROM products p
 LEFT JOIN categories c ON c.id = p.category_id
-LEFT JOIN product_barcodes b ON b.product_id = p.id AND b.is_primary = 1
-LEFT JOIN available_inventory ai ON ai.product_id = p.id`;
+LEFT JOIN inventory_stock s ON s.product_id=p.id AND s.warehouse_id='warehouse_main'`;
+
+export type ProductPageQuery = {
+  search?: string;
+  categoryId?: string | null;
+  includeInactive?: boolean;
+  status?: "ACTIVE" | "INACTIVE" | "ALL";
+  pageSize?: number;
+  cursor?: string | null;
+};
+
+function encodeCursor(product: ProductRecord) {
+  return encodeURIComponent(JSON.stringify([product.name, product.id]));
+}
+
+function decodeCursor(cursor: string | null | undefined) {
+  if (!cursor) return null;
+  try {
+    const value = JSON.parse(decodeURIComponent(cursor)) as unknown;
+    return Array.isArray(value) && typeof value[0] === "string" && typeof value[1] === "string" ? { name: value[0], id: value[1] } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Normalizes scanner input consistently before exact indexed lookup. */
+export function normalizeBarcode(value: string) {
+  return value.trim();
+}
 
 export class CatalogService {
   constructor(private db: LocalDatabase) {}
@@ -87,20 +121,56 @@ export class CatalogService {
     return id;
   }
 
-  async listProducts(search = "", includeInactive = false) {
-    const term = `%${search.trim()}%`;
+  /** Returns one stable, bounded catalog page using database filtering and keyset pagination. */
+  async listProductPage(query: ProductPageQuery = {}): Promise<PageResult<ProductRecord>> {
+    const search = query.search?.trim() ?? "";
+    const prefix = `${search}%`;
+    const pageSize = Math.min(Math.max(Math.trunc(query.pageSize ?? 60), 10), 200);
+    const cursor = decodeCursor(query.cursor);
+    const where = ["p.deleted_at IS NULL"];
+    const values: Array<string | number | null> = [];
+    const status = query.status ?? (query.includeInactive ? "ALL" : "ACTIVE");
+    if (status !== "ALL") { where.push("p.status=?"); values.push(status); }
+    if (query.categoryId) { where.push("p.category_id=?"); values.push(query.categoryId); }
+    if (search) {
+      where.push(`(p.sku=? COLLATE NOCASE
+        OR EXISTS(SELECT 1 FROM product_barcodes bx WHERE bx.product_id=p.id AND bx.value=? COLLATE NOCASE)
+        OR p.name=? COLLATE NOCASE OR p.name LIKE ? COLLATE NOCASE OR p.sku LIKE ? COLLATE NOCASE
+        OR EXISTS(SELECT 1 FROM product_barcodes bp WHERE bp.product_id=p.id AND bp.value LIKE ? COLLATE NOCASE))`);
+      values.push(search, normalizeBarcode(search), search, prefix, prefix, prefix);
+    }
+    if (cursor) {
+      where.push("(p.name > ? COLLATE NOCASE OR (p.name = ? COLLATE NOCASE AND p.id > ?))");
+      values.push(cursor.name, cursor.name, cursor.id);
+    }
     const rows = await this.db.query<ProductRow>(
-      `${productSelect}
-       WHERE p.deleted_at IS NULL AND (? = 1 OR p.status = 'ACTIVE')
-         AND (? = '%%' OR p.name LIKE ? COLLATE NOCASE OR p.sku LIKE ? COLLATE NOCASE OR b.value LIKE ? COLLATE NOCASE)
-       GROUP BY p.id, b.value, c.name ORDER BY p.name LIMIT 2000`,
-      [includeInactive ? 1 : 0, term, term, term, term]
+      `${productSelect} WHERE ${where.join(" AND ")} ORDER BY p.name COLLATE NOCASE, p.id LIMIT ?`,
+      [...values, pageSize + 1]
     );
-    return rows.map(mapProduct);
+    const mapped = rows.map(mapProduct);
+    const items = mapped.slice(0, pageSize);
+    return { items, nextCursor: mapped.length > pageSize && items.length ? encodeCursor(items[items.length - 1]!) : null };
+  }
+
+  /** Backward-compatible bounded search used by older callers during migration. */
+  async listProducts(search = "", includeInactive = false) {
+    return (await this.listProductPage({ search, includeInactive, pageSize: 100 })).items;
+  }
+
+  /** Performs an exact unique-barcode lookup without wildcard scans or image loading. */
+  async findByBarcode(barcode: string) {
+    const normalized = normalizeBarcode(barcode);
+    if (!normalized) return null;
+    const rows = await this.db.query<ProductRow>(
+      `${productSelect} JOIN product_barcodes exact_barcode ON exact_barcode.product_id=p.id
+       WHERE exact_barcode.value=? COLLATE NOCASE AND p.status='ACTIVE' AND p.deleted_at IS NULL LIMIT 1`,
+      [normalized]
+    );
+    return rows[0] ? mapProduct(rows[0]) : null;
   }
 
   async getProduct(id: string) {
-    const rows = await this.db.query<ProductRow>(`${productSelect} WHERE p.id = ? AND p.deleted_at IS NULL GROUP BY p.id, b.value, c.name`, [id]);
+    const rows = await this.db.query<ProductRow>(`${productSelect} WHERE p.id = ? AND p.deleted_at IS NULL LIMIT 1`, [id]);
     const row = rows[0];
     if (!row) throw new Error("Product was not found.");
     return mapProduct(row);
@@ -137,7 +207,7 @@ export class CatalogService {
         await this.db.run("INSERT OR IGNORE INTO inventory_stock(product_id, warehouse_id, quantity_micro, updated_at) VALUES (?, 'warehouse_main', 0, ?)", [id, now], false);
       }
       if (input.barcode?.trim()) {
-        await this.db.run("INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", [createId("barcode"), id, input.barcode.trim(), now], false);
+        await this.db.run("INSERT INTO product_barcodes(id, product_id, value, is_primary, created_at) VALUES (?, ?, ?, 1, ?)", [createId("barcode"), id, normalizeBarcode(input.barcode), now], false);
       }
       await audit(this.db, { actorId: actor.id, action: input.id ? "PRODUCT_UPDATED" : "PRODUCT_CREATED", entityType: "Product", entityId: id, metadata: { sku, name: input.name.trim() } });
     });

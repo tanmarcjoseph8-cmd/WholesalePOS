@@ -1,5 +1,22 @@
 # Migration Notes
 
+## 0.8.0 large-catalog migration
+
+Version 0.8.0 adds migration 9. It creates additive catalog, movement, sales,
+item, payment, refund, and history indexes. It also creates `price_levels`,
+`product_prices`, and `product_images`; existing product, inventory, sale,
+license, user, and audit rows are not rewritten or deleted.
+
+Migration 9 runs through the existing transactional migration runner. Make a full
+0.7.0 backup before installation. If startup fails, preserve app storage and the
+database; do not use Factory Reset. Reinstall 0.8.0 and retry after collecting the
+startup error. A downgrade requires restoring the pre-upgrade backup into a 0.7.0
+test installation because the older binary does not manage the new tables.
+
+The retail and wholesale columns remain authoritative fallbacks, so products made
+by older releases continue to sell at the same prices until a manager adds an
+effective-dated price rule.
+
 The Android edition is an independent product with package ID
 `com.wholesalepos.offline`. It does not connect to, package, migrate, or modify
 the Windows Electron application.

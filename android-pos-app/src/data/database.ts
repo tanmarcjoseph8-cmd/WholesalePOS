@@ -1,10 +1,11 @@
 import { Capacitor } from "@capacitor/core";
-import { CapacitorSQLite, SQLiteConnection, type SQLiteDBConnection, type capSQLiteJson } from "@capacitor-community/sqlite";
+import { CapacitorSQLite, SQLiteConnection, type SQLiteDBConnection, type capSQLiteJson, type capSQLiteSet } from "@capacitor-community/sqlite";
 import { currentSchemaVersion, migrations } from "./migrations";
 import { createId, nowIso } from "../domain/models";
 
 export type SqlValue = string | number | null;
 export type InventoryChangeListener = () => Promise<unknown> | unknown;
+export type BatchStatement = { statement: string; values?: SqlValue[] };
 
 export function isInventoryMutationSql(sql: string) {
   const normalized = sql.trim().toLowerCase();
@@ -94,6 +95,17 @@ export class LocalDatabase {
     return result;
   }
 
+  /** Executes many parameterized statements through one native bridge call. */
+  async executeSet(statements: BatchStatement[], transaction = true) {
+    if (!statements.length) return null;
+    const result = await this.requireConnection().executeSet(statements as capSQLiteSet[], transaction);
+    if (statements.some((entry) => isInventoryMutationSql(entry.statement))) {
+      this.inventoryChangePending = true;
+      if (this.transactionDepth === 0) await this.flushInventoryChanges();
+    }
+    return result;
+  }
+
   async query<T extends object>(sql: string, values: SqlValue[] = []) {
     const result = await this.requireConnection().query(sql, values);
     return (result.values ?? []) as T[];
@@ -143,6 +155,24 @@ export class LocalDatabase {
   async integrityCheck() {
     const rows = await this.query<{ integrity_check: string }>("PRAGMA integrity_check");
     return rows[0]?.integrity_check === "ok";
+  }
+
+  /** Returns lightweight database health and size information without mutating records. */
+  async healthSnapshot() {
+    const quick = await this.query<{ quick_check: string }>("PRAGMA quick_check");
+    const pages = await this.query<{ page_count: number }>("PRAGMA page_count");
+    const pageSize = await this.query<{ page_size: number }>("PRAGMA page_size");
+    const freePages = await this.query<{ freelist_count: number }>("PRAGMA freelist_count");
+    const count = Number(pages[0]?.page_count ?? 0);
+    const size = Number(pageSize[0]?.page_size ?? 0);
+    return { healthy: quick[0]?.quick_check === "ok", bytes: count * size, pageCount: count, freePageCount: Number(freePages[0]?.freelist_count ?? 0) };
+  }
+
+  /** Refreshes SQLite planner statistics only when no migration or transaction is active. */
+  async optimize() {
+    if (this.migrationInProgress || this.transactionDepth > 0) throw new Error("Database maintenance cannot run during another operation.");
+    await this.execute("PRAGMA optimize;", false);
+    return this.healthSnapshot();
   }
 
   async schemaVersion() {

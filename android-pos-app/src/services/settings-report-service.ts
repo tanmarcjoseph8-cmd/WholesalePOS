@@ -75,12 +75,14 @@ export class SettingsReportService {
   }
 
   async salesReport(from: string, to: string) {
+    const settings = await this.getSettings();
+    const range = reportRange("CUSTOM", settings.businessTimezone, { fromDate: from, toDate: to });
     return this.db.query<{
       receipt_number: string; order_type: string; status: string; grand_total_cents: number; cashier_name: string; created_at: string;
     }>(
       `SELECT s.receipt_number, s.order_type, s.status, s.grand_total_cents, u.name AS cashier_name, s.created_at
-       FROM sales s JOIN users u ON u.id=s.cashier_id WHERE substr(s.created_at,1,10) BETWEEN ? AND ? AND s.deleted_at IS NULL ORDER BY s.created_at DESC`,
-      [from, to]
+       FROM sales s JOIN users u ON u.id=s.cashier_id WHERE s.created_at>=? AND s.created_at<? AND s.deleted_at IS NULL ORDER BY s.created_at DESC`,
+      [range.startIso, range.endExclusiveIso]
     );
   }
 

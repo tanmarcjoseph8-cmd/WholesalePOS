@@ -513,6 +513,82 @@ ALTER TABLE license_state ADD COLUMN license_type TEXT NOT NULL DEFAULT 'LIFETIM
 ALTER TABLE license_state ADD COLUMN expiration_at TEXT;
 ALTER TABLE license_state ADD COLUMN license_serial_number TEXT;
 `
+  },
+  {
+    version: 9,
+    name: "large_catalog_performance",
+    sql: `
+CREATE INDEX IF NOT EXISTS products_active_name_page_idx ON products(status, name COLLATE NOCASE, id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS products_category_name_page_idx ON products(category_id, status, name COLLATE NOCASE, id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS products_created_idx ON products(created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS inventory_movements_created_idx ON inventory_movements(created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_movements_type_created_idx ON inventory_movements(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS inventory_movements_product_type_created_idx ON inventory_movements(product_id, type, created_at DESC);
+CREATE INDEX IF NOT EXISTS sales_cashier_created_idx ON sales(cashier_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS sales_order_type_created_idx ON sales(order_type, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS sales_history_page_idx ON sales(created_at DESC, id DESC) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS sale_items_product_sale_idx ON sale_items(product_id, sale_id);
+CREATE INDEX IF NOT EXISTS sale_payments_method_created_idx ON sale_payments(method, created_at DESC);
+CREATE INDEX IF NOT EXISTS refunds_created_idx ON refunds(created_at DESC);
+CREATE INDEX IF NOT EXISTS import_batches_status_created_idx ON import_batches(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS price_levels (
+  id TEXT PRIMARY KEY NOT NULL,
+  code TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  name TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS product_prices (
+  id TEXT PRIMARY KEY NOT NULL,
+  product_id TEXT NOT NULL REFERENCES products(id),
+  price_level_id TEXT NOT NULL REFERENCES price_levels(id),
+  price_cents INTEGER NOT NULL CHECK(price_cents >= 0),
+  minimum_quantity_micro INTEGER NOT NULL DEFAULT 0 CHECK(minimum_quantity_micro >= 0),
+  effective_at TEXT NOT NULL,
+  expires_at TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT,
+  CHECK(expires_at IS NULL OR expires_at > effective_at)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS product_prices_rule_uq
+  ON product_prices(product_id, price_level_id, minimum_quantity_micro, effective_at)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS product_prices_lookup_idx
+  ON product_prices(product_id, price_level_id, is_active, minimum_quantity_micro DESC, effective_at DESC)
+  WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS product_images (
+  id TEXT PRIMARY KEY NOT NULL,
+  product_id TEXT NOT NULL REFERENCES products(id),
+  file_path TEXT NOT NULL,
+  thumbnail_path TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  width INTEGER NOT NULL CHECK(width > 0),
+  height INTEGER NOT NULL CHECK(height > 0),
+  byte_size INTEGER NOT NULL CHECK(byte_size > 0),
+  is_primary INTEGER NOT NULL DEFAULT 1 CHECK(is_primary IN (0,1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images(product_id, is_primary, updated_at DESC) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS product_images_primary_uq ON product_images(product_id) WHERE is_primary=1 AND deleted_at IS NULL;
+
+INSERT OR IGNORE INTO price_levels(id, code, name, priority, created_at, updated_at)
+VALUES ('price_retail', 'RETAIL', 'Retail', 10, datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO price_levels(id, code, name, priority, created_at, updated_at)
+VALUES ('price_wholesale', 'WHOLESALE', 'Wholesale', 20, datetime('now'), datetime('now'));
+INSERT OR IGNORE INTO price_levels(id, code, name, priority, created_at, updated_at)
+VALUES ('price_distributor', 'DISTRIBUTOR', 'Distributor', 30, datetime('now'), datetime('now'));
+`
   }
 ];
 

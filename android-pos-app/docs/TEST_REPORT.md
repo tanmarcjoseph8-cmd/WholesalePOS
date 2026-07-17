@@ -2,6 +2,25 @@
 
 Verified through 18 July 2026.
 
+## 0.8.0 scalability milestone
+
+Completed in the current workspace:
+
+- strict TypeScript build: passed;
+- ESLint over `src`, `scripts`, and config files: passed;
+- temporary SQLite benchmark at 100,000 products, 1,000,000 movements, and
+  500,000 sales: passed and recorded in `PERFORMANCE_RESULTS.json`;
+- exact barcode query-plan inspection: unique barcode, product primary key, and
+  inventory-stock primary key indexes used.
+- clean in-memory application of migrations 1 through 9: passed with zero foreign
+  key violations.
+
+Vitest and the Vite bundle could not run inside the managed filesystem sandbox:
+esbuild attempted to inspect a protected parent directory. The request to run
+those tools outside the sandbox was unavailable because the Codex approval quota
+was exhausted. They remain mandatory before publishing the 0.8.0 APK. Native
+Android/Fire OS verification also remains pending on physical devices.
+
 Version 0.7.0 adds renewable offline Monthly, Yearly, and Lifetime licenses,
 Android-Keystore-backed clock rollback detection, license expiration warnings,
 same-device renewal, and Suki Sync mobile branding. Existing version 1 licenses

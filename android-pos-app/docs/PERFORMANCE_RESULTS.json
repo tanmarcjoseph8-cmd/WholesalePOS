@@ -1,0 +1,188 @@
+{
+  "generated_at": "2026-07-17T20:36:26Z",
+  "environment": {
+    "python": "3.14.6",
+    "sqlite": "3.50.4",
+    "platform": "nt",
+    "temporary_database": "C:\\Users\\User\\AppData\\Local\\Temp\\suki-sync-benchmark-_c_jpi59\\benchmark.sqlite"
+  },
+  "dataset": {
+    "products": 100000,
+    "inventory_movements": 1000000,
+    "sales": 500000,
+    "sale_items": 500000,
+    "payments": 500000,
+    "database_bytes": 624701440
+  },
+  "startup_ms": 0.509,
+  "data_generation": {
+    "product_import_seconds": 0.712,
+    "movement_insert_seconds": 3.067,
+    "sales_insert_seconds": 5.422
+  },
+  "optimized_index_build_seconds": 9.48,
+  "before": {
+    "barcode_general_search": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 50.408,
+      "median_ms": 49.053,
+      "p95_ms": 57.979,
+      "maximum_ms": 59.968
+    },
+    "catalog_first_2000": {
+      "runs": 15,
+      "rows": 2000,
+      "average_ms": 71.445,
+      "median_ms": 70.718,
+      "p95_ms": 77.749,
+      "maximum_ms": 80.877
+    },
+    "product_name_contains": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 48.02,
+      "median_ms": 46.721,
+      "p95_ms": 54.939,
+      "maximum_ms": 59.708
+    },
+    "sales_history_1000": {
+      "runs": 20,
+      "rows": 1000,
+      "average_ms": 3.43,
+      "median_ms": 3.434,
+      "p95_ms": 3.558,
+      "maximum_ms": 3.872
+    }
+  },
+  "after": {
+    "barcode_exact": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 0.012,
+      "median_ms": 0.007,
+      "p95_ms": 0.009,
+      "maximum_ms": 0.17
+    },
+    "catalog_page_60": {
+      "runs": 40,
+      "rows": 60,
+      "average_ms": 0.03,
+      "median_ms": 0.03,
+      "p95_ms": 0.042,
+      "maximum_ms": 0.096
+    },
+    "product_name_prefix": {
+      "runs": 40,
+      "rows": 60,
+      "average_ms": 0.038,
+      "median_ms": 0.035,
+      "p95_ms": 0.043,
+      "maximum_ms": 0.101
+    },
+    "sku_exact": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 0.005,
+      "median_ms": 0.004,
+      "p95_ms": 0.008,
+      "maximum_ms": 0.027
+    },
+    "movement_product_recent": {
+      "runs": 40,
+      "rows": 10,
+      "average_ms": 0.015,
+      "median_ms": 0.01,
+      "p95_ms": 0.021,
+      "maximum_ms": 0.134
+    },
+    "sales_history_page_100": {
+      "runs": 40,
+      "rows": 100,
+      "average_ms": 0.074,
+      "median_ms": 0.062,
+      "p95_ms": 0.07,
+      "maximum_ms": 0.419
+    },
+    "receipt_exact": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 0.005,
+      "median_ms": 0.004,
+      "p95_ms": 0.005,
+      "maximum_ms": 0.028
+    },
+    "daily_report": {
+      "runs": 40,
+      "rows": 1,
+      "average_ms": 0.009,
+      "median_ms": 0.006,
+      "p95_ms": 0.014,
+      "maximum_ms": 0.08
+    },
+    "monthly_report": {
+      "runs": 20,
+      "rows": 1,
+      "average_ms": 234.649,
+      "median_ms": 230.726,
+      "p95_ms": 242.845,
+      "maximum_ms": 267.289
+    }
+  },
+  "write_operations": {
+    "product_edit": {
+      "runs": 30,
+      "average_ms": 0.037,
+      "median_ms": 0.031,
+      "p95_ms": 0.035,
+      "maximum_ms": 0.187
+    },
+    "inventory_deduction": {
+      "runs": 30,
+      "average_ms": 0.015,
+      "median_ms": 0.014,
+      "p95_ms": 0.017,
+      "maximum_ms": 0.052
+    }
+  },
+  "barcode_lookup_by_catalog_size": {
+    "1000": {
+      "runs": 60,
+      "rows": 1,
+      "average_ms": 0.002,
+      "median_ms": 0.002,
+      "p95_ms": 0.002,
+      "maximum_ms": 0.027
+    },
+    "10000": {
+      "runs": 60,
+      "rows": 1,
+      "average_ms": 0.003,
+      "median_ms": 0.002,
+      "p95_ms": 0.002,
+      "maximum_ms": 0.038
+    },
+    "50000": {
+      "runs": 60,
+      "rows": 1,
+      "average_ms": 0.003,
+      "median_ms": 0.002,
+      "p95_ms": 0.003,
+      "maximum_ms": 0.058
+    },
+    "100000": {
+      "runs": 60,
+      "rows": 1,
+      "average_ms": 0.003,
+      "median_ms": 0.002,
+      "p95_ms": 0.003,
+      "maximum_ms": 0.062
+    }
+  },
+  "exact_barcode_query_plan": [
+    "SEARCH b USING INDEX sqlite_autoindex_product_barcodes_2 (value=?)",
+    "SEARCH p USING INDEX sqlite_autoindex_products_1 (id=?)",
+    "SEARCH s USING INDEX sqlite_autoindex_inventory_stock_1 (product_id=? AND warehouse_id=?) LEFT-JOIN"
+  ],
+  "qualification": "Desktop SQLite synthetic query benchmark; native Android bridge, WebView rendering, XLSX parsing, and physical storage latency require device testing."
+}

@@ -14,6 +14,12 @@ Sync. It does not require a server or package the Windows Electron backend.
 
 See `docs/AUDIT.md` for the Windows compatibility audit and `docs/ARCHITECTURE.md` for Android boundaries.
 
+Version 0.8.0 adds keyset-paginated catalog and sales screens, exact indexed
+barcode lookup, 100,000-row import batching, product images, extensible price
+levels, SQL-aggregated reports, and database health controls. See the
+[scalability guide](docs/SCALABILITY_GUIDE.md) and
+[benchmark results](docs/PERFORMANCE_RESULTS.md).
+
 ## Installable builds
 
 - `apk/Suki-Sync-0.7.0-release.apk`: signed APK for direct tablet installation
@@ -41,6 +47,8 @@ Native APK builds require JDK 21 and Android SDK 36. Detailed setup and signing 
 - [Sales reports and inventory alerts](docs/SALES_REPORTS_AND_ALERTS.md)
 - [Cash drawer operations](docs/CASH_DRAWER.md)
 - [Product import format](docs/IMPORT_TEMPLATE.md)
+- [Scalability and operations](docs/SCALABILITY_GUIDE.md)
+- [Performance benchmark](docs/PERFORMANCE_RESULTS.md)
 - [Fire OS 7 installation](docs/FIRE_OS_7.md)
 - [Printer setup](docs/PRINTER_SETUP.md)
 - [Migration notes](docs/MIGRATION_NOTES.md)

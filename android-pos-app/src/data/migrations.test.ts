@@ -5,8 +5,8 @@ describe("offline database migrations", () => {
   const sql = migrations.map((migration) => migration.sql).join("\n").toLowerCase();
 
   it("uses ordered, non-destructive migration versions", () => {
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(currentSchemaVersion).toBe(8);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(currentSchemaVersion).toBe(9);
     expect(sql).not.toMatch(/\bdrop\s+(table|column|index)\b/);
   });
 
@@ -14,7 +14,7 @@ describe("offline database migrations", () => {
     const required = [
       "users", "products", "inventory_stock", "inventory_movements", "restaurant_tables", "orders",
       "order_items", "inventory_reservations", "sales", "sale_items", "sale_payments", "refunds",
-      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts", "cash_sessions", "cash_movements", "device_state", "license_state"
+      "refund_items", "audit_logs", "settings", "import_batches", "inventory_alert_state", "inventory_alerts", "cash_sessions", "cash_movements", "device_state", "license_state", "price_levels", "product_prices", "product_images"
     ];
     for (const table of required) expect(sql).toContain(`create table if not exists ${table}`);
   });
@@ -45,6 +45,12 @@ describe("offline database migrations", () => {
 
   it("indexes inventory, active orders, sales, and audit history", () => {
     for (const index of ["inventory_movements_product_idx", "reservations_stock_idx", "orders_status_idx", "sales_created_idx", "audit_entity_idx", "inventory_alerts_unread_idx"]) {
+      expect(sql).toContain(`index if not exists ${index}`);
+    }
+  });
+
+  it("adds bounded catalog, history, pricing, and image indexes", () => {
+    for (const index of ["products_active_name_page_idx", "products_category_name_page_idx", "inventory_movements_type_created_idx", "sales_cashier_created_idx", "sales_history_page_idx", "sale_payments_method_created_idx", "product_prices_lookup_idx", "product_images_product_idx"]) {
       expect(sql).toContain(`index if not exists ${index}`);
     }
   });

@@ -24,12 +24,18 @@ export type ProductRecord = {
   stockMicro: number;
   reservedMicro: number;
   availableMicro: number;
+  thumbnailPath: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type ProductInput = Omit<ProductRecord, "id" | "categoryName" | "stockMicro" | "reservedMicro" | "availableMicro" | "createdAt" | "updatedAt"> & {
+export type ProductInput = Omit<ProductRecord, "id" | "categoryName" | "stockMicro" | "reservedMicro" | "availableMicro" | "thumbnailPath" | "createdAt" | "updatedAt"> & {
   id?: string;
+};
+
+export type PageResult<T> = {
+  items: T[];
+  nextCursor: string | null;
 };
 
 export type CartLine = {

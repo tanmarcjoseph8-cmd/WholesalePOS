@@ -1,5 +1,18 @@
 # Known Limitations
 
+## 0.8.0 scalability qualification
+
+- The 100,000-product/1,000,000-movement/500,000-sale benchmark measures desktop
+  SQLite. Capacitor bridge, WebView, flash-storage, and thermal performance still
+  require the physical-device checklist in `SCALABILITY_GUIDE.md`.
+- CSV is recommended for very large imports. XLSX parsing remains in the WebView
+  and can consume substantial memory on older Fire OS 7 tablets.
+- Report totals are database-aggregated, but the on-screen transaction detail list
+  intentionally shows the latest 500 matching transactions. Use Sales History or
+  exports to inspect older individual receipts.
+- Replacing a product photo soft-deletes its old metadata but retains the old
+  private file. This favors rollback safety over immediate storage reclamation.
+
 - Data is intentionally local to one tablet; there is no cloud sync, multi-device
   realtime sync, web server, or Windows connection.
 - License generation and customer records are intentionally offline in the

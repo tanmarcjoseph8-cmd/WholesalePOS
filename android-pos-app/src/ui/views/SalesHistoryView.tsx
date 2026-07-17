@@ -4,6 +4,7 @@ import { createId, formatMoney, formatQuantity, QUANTITY_SCALE, type SaleSummary
 import type { SaleDetail } from "../../services/sales-service";
 import { useOfflineApp } from "../app-context";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { useDebouncedValue } from "../use-debounced-value";
 
 type ReversalMode = "REFUND" | "VOID";
 
@@ -12,19 +13,47 @@ export function SalesHistoryView() {
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [detail, setDetail] = useState<SaleDetail | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<ReversalMode | null>(null);
   const [reason, setReason] = useState("");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const reversalKey = useRef(createId("reversal"));
+  const listRequest = useRef(0);
 
-  useEffect(() => { void app.sales.listSales(1000).then(setSales); }, [app, revision]);
+  const historyQuery = useMemo(() => ({ search: debouncedSearch, status: statusFilter || null, paymentMethod: paymentFilter || null,
+    fromIso: fromDate ? new Date(`${fromDate}T00:00:00`).toISOString() : null,
+    toExclusiveIso: toDate ? new Date(new Date(`${toDate}T00:00:00`).getTime() + 86_400_000).toISOString() : null, pageSize: 100 }), [debouncedSearch, fromDate, paymentFilter, statusFilter, toDate]);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return sales;
-    return sales.filter((sale) => [sale.receiptNumber, sale.orderNumber, sale.orderType, sale.status].some((value) => value?.toLowerCase().includes(query)));
-  }, [sales, search]);
+  useEffect(() => {
+    const request = ++listRequest.current;
+    setLoading(true);
+    setLoadError(null);
+    void app.sales.listSalesPage(historyQuery).then((page) => {
+      if (request !== listRequest.current) return;
+      setSales(page.items);
+      setNextCursor(page.nextCursor);
+    }).catch((caught: unknown) => { if (request === listRequest.current) setLoadError(caught instanceof Error ? caught.message : "Sales could not be loaded."); })
+      .finally(() => { if (request === listRequest.current) setLoading(false); });
+  }, [app, historyQuery, revision]);
+
+  async function loadMoreSales() {
+    if (!nextCursor || loading) return;
+    setLoading(true);
+    try {
+      const page = await app.sales.listSalesPage({ ...historyQuery, cursor: nextCursor });
+      setSales((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch (caught) { setLoadError(caught instanceof Error ? caught.message : "More sales could not be loaded."); }
+    finally { setLoading(false); }
+  }
 
   async function openSale(id: string) {
     try { setDetail(await app.sales.getSale(id)); }
@@ -67,11 +96,14 @@ export function SalesHistoryView() {
   return (
     <section className="page-stack">
       <header className="page-header"><div><h2>Sales history</h2><p>Receipts and reversals saved on this tablet.</p></div></header>
-      <label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Receipt, order, type, or status" /></label>
+      <div className="history-filter-bar"><label className="search-box"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Receipt or order number" /></label><label>Status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option><option value="COMPLETED">Completed</option><option value="PARTIALLY_REFUNDED">Partially refunded</option><option value="REFUNDED">Refunded</option><option value="VOIDED">Voided</option></select></label><label>Payment<select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)}><option value="">All methods</option><option value="CASH">Cash</option><option value="GCASH">GCash</option><option value="CARD">Card</option><option value="OTHER">Other</option></select></label><label>From<input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></label><label>To<input type="date" min={fromDate || undefined} value={toDate} onChange={(event) => setToDate(event.target.value)} /></label></div>
+      {loadError ? <p className="inline-error" role="alert">{loadError}</p> : null}
       <div className="history-layout">
         <section className="sale-list data-panel">
-          {filtered.map((sale) => <button className={detail?.id === sale.id ? "selected" : ""} key={sale.id} onClick={() => void openSale(sale.id)}><div><strong>{sale.receiptNumber}</strong><span>{new Date(sale.createdAt).toLocaleString("en-PH")}</span></div><div><b>{formatMoney(sale.grandTotalCents)}</b><small>{sale.status.replaceAll("_", " ")}</small></div></button>)}
-          {!filtered.length ? <p className="empty-state">No matching sales.</p> : null}
+          {sales.map((sale) => <button className={detail?.id === sale.id ? "selected" : ""} key={sale.id} onClick={() => void openSale(sale.id)}><div><strong>{sale.receiptNumber}</strong><span>{new Date(sale.createdAt).toLocaleString("en-PH")}</span></div><div><b>{formatMoney(sale.grandTotalCents)}</b><small>{sale.status.replaceAll("_", " ")}</small></div></button>)}
+          {loading && !sales.length ? <p className="loading" role="status">Loading sales...</p> : null}
+          {!loading && !sales.length ? <p className="empty-state">No matching sales.</p> : null}
+          {nextCursor ? <button className="button secondary load-more" disabled={loading} onClick={() => void loadMoreSales()}>{loading ? "Loading..." : "Load more sales"}</button> : null}
         </section>
         <section className="receipt-detail data-panel">
           {detail ? <><header><div><span className="eyebrow">{detail.orderType.replaceAll("_", " ")}</span><h3>{detail.receiptNumber}</h3><p>{new Date(detail.createdAt).toLocaleString("en-PH")} | {detail.cashierName}</p></div><button className="button secondary" onClick={() => void printReceipt()}><Printer size={18} /> Receipt</button></header>
